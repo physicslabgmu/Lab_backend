@@ -10,6 +10,16 @@ const app = express();
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
+app.use(cors({
+    origin: [
+        'https://physicslabgmu.github.io',
+        'http://localhost:3000',
+        'http://localhost:5500'
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true
+}));
+
 app.use(cors());
 app.use(express.json());
 
@@ -40,6 +50,7 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// app.listen(port, () => {
-//     console.log(`Server running on http://localhost:${port}`);
-// });
+const PORT = process.env.PORT || 10000;
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on ${port}`);
+});
