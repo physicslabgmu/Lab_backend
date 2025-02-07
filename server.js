@@ -4,7 +4,7 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
-const port = 3000;
+// const port = 3000;
 
 // Initialize Google Gemini AI
 const apiKey = process.env.GEMINI_API_KEY;
