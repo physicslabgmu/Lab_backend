@@ -76,7 +76,7 @@ const port = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors({
-    origin: 'https://physicslabgmu.github.io',
+    origin: 'https://github.com/physicslabgmu/Lab_db/blob/main/chatbot.html',
     methods: ['GET', 'POST'],
     credentials: true
 }));
