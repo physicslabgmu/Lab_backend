@@ -76,7 +76,7 @@ const port = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors({
-    origin: '*',
+    origin: 'https://physicslabgmu.github.io',
     methods: ['GET', 'POST'],
     credentials: true
 }));
