@@ -3,6 +3,10 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+require('dotenv').config(); // Ensure environment variables are loaded
+
+// Middleware to parse JSON (important for request body parsing)
+router.use(express.json());
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -54,7 +58,7 @@ router.post('/register', async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        res.json({
+        res.status(201).json({
             message: 'Registration successful',
             token,
             user: {
@@ -66,7 +70,7 @@ router.post('/register', async (req, res) => {
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Registration failed' });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -112,14 +116,14 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 // Verify token endpoint
 router.get('/verify', async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const token = req.headers.authorization?.split(' ')[1]; // Extract token
         if (!token) {
             return res.status(401).json({ error: 'No token provided' });
         }
@@ -144,5 +148,14 @@ router.get('/verify', async (req, res) => {
         res.status(401).json({ error: 'Invalid token' });
     }
 });
+
+// ✅ Allow CORS for frontend communication
+const cors = require('cors');
+router.use(cors({
+    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'https://physicslabgmu.github.io'],
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 
 module.exports = router;
