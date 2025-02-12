@@ -163,7 +163,7 @@ PHY 161:
 
 // Configure CORS
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:5500', 'http://localhost:3000'],
+    origin: ['http://127.0.0.1:5500', 'http://localhost:5500', 'http://localhost:3000', 'https://physicslabgmu.github.io/Lab_db'],
     methods: ['GET', 'POST'],
     credentials: true
 }));
