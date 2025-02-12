@@ -15,9 +15,10 @@ const userSchema = new mongoose.Schema({
 });
 
 // ✅ Ensure the unique index is created properly
-userSchema.index({ email: 1 }, { unique: true });
+// userSchema.index({ email: 1 }, { unique: true });
 
 const User = mongoose.model('User', userSchema);
+module.exports = User;
 
 // ✅ Register Endpoint (Fixed Version)
 router.post('/register', async (req, res) => {
