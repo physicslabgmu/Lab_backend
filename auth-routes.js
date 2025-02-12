@@ -7,12 +7,15 @@ require('dotenv').config(); // Ensure environment variables are loaded
 
 // User Schema
 const userSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true},
     password: { type: String, required: true },
     name: { type: String, required: true },
     role: { type: String, default: 'user' },
     createdAt: { type: Date, default: Date.now }
 });
+
+// ✅ Ensure the unique index is created properly
+userSchema.index({ email: 1 }, { unique: true });
 
 const User = mongoose.model('User', userSchema);
 
@@ -27,15 +30,15 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        // Ensure email is case-insensitive unique
+        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
         if (existingUser) {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
-        // Ensure JWT_SECRET is available
+        // Ensure JWT_SECRET exists
         if (!process.env.JWT_SECRET) {
-            console.error('❌ JWT_SECRET is missing in environment variables.');
+            console.error('❌ JWT_SECRET is missing.');
             return res.status(500).json({ error: 'Server misconfiguration' });
         }
 
@@ -50,12 +53,17 @@ router.post('/register', async (req, res) => {
         }
 
         // Create user
-        const user = new User({ email, password: hashedPassword, name, role: 'user' });
+        const user = new User({ 
+            email: email.toLowerCase().trim(), // ✅ Convert email to lowercase before saving
+            password: hashedPassword,
+            name,
+            role: 'user'
+        });
 
         try {
             await user.save();
         } catch (err) {
-            if (err.code === 11000) { // Handle duplicate email errors
+            if (err.code === 11000) { // ✅ Handle duplicate email error from MongoDB
                 return res.status(400).json({ error: 'Email already registered' });
             }
             console.error('❌ Database save error:', err);
@@ -82,8 +90,6 @@ router.post('/register', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-
-module.exports = router;
 
 
 // Login endpoint
