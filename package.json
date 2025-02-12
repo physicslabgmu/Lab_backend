@@ -1,19 +1,27 @@
 {
-  "name": "lab-setup",
+  "name": "gmu-physics-lab",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "GMU Physics Lab Website with Chatbot Assistant",
+  "main": "js/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node js/server.js",
+    "dev": "nodemon js/server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
+    "@google/generative-ai": "^0.1.3",
+    "bcryptjs": "^2.4.3",
+    "bootstrap": "^5.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "node-fetch": "^3.3.2"
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.13.0",
+    "mongoose": "^8.10.0"
   },
-  "description": ""
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
