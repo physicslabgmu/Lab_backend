@@ -5,9 +5,6 @@ const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 require('dotenv').config(); // Ensure environment variables are loaded
 
-// Middleware to parse JSON (important for request body parsing)
-router.use(express.json());
-
 // User Schema
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
@@ -19,11 +16,11 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// Register endpoint
+// ✅ Register Endpoint (Fixed Version)
 router.post('/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
-        console.log('Register request:', { name, email }); // Debug log
+        console.log('🔹 Register request:', { name, email });
 
         // Validate input
         if (!email || !password || !name) {
@@ -36,22 +33,38 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        // Ensure JWT_SECRET is available
+        if (!process.env.JWT_SECRET) {
+            console.error('❌ JWT_SECRET is missing in environment variables.');
+            return res.status(500).json({ error: 'Server misconfiguration' });
+        }
+
+        // Hash password safely
+        let hashedPassword;
+        try {
+            const salt = await bcrypt.genSalt(10);
+            hashedPassword = await bcrypt.hash(password, salt);
+        } catch (err) {
+            console.error('❌ Error hashing password:', err);
+            return res.status(500).json({ error: 'Password encryption failed' });
+        }
 
         // Create user
-        const user = new User({
-            email,
-            password: hashedPassword,
-            name,
-            role: 'user'
-        });
+        const user = new User({ email, password: hashedPassword, name, role: 'user' });
 
-        await user.save();
-        console.log('User saved:', user._id); // Debug log
+        try {
+            await user.save();
+        } catch (err) {
+            if (err.code === 11000) { // Handle duplicate email errors
+                return res.status(400).json({ error: 'Email already registered' });
+            }
+            console.error('❌ Database save error:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
 
-        // Create token
+        console.log('✅ User registered:', user._id);
+
+        // Create JWT Token
         const token = jwt.sign(
             { id: user._id, email: user.email, role: user.role },
             process.env.JWT_SECRET,
@@ -61,18 +74,17 @@ router.post('/register', async (req, res) => {
         res.status(201).json({
             message: 'Registration successful',
             token,
-            user: {
-                id: user._id,
-                email: user.email,
-                name: user.name,
-                role: user.role
-            }
+            user: { id: user._id, email: user.email, name: user.name, role: user.role }
         });
+
     } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('❌ Registration error:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+module.exports = router;
+
 
 // Login endpoint
 router.post('/login', async (req, res) => {
