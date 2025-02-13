@@ -26,25 +26,19 @@ router.post('/register', async (req, res) => {
         const { name, email, password } = req.body;
         console.log('🔹 Register request:', { name, email });
 
-        // Validate input
         if (!email || !password || !name) {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        // Ensure email is case-insensitive unique
-        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-        
-        console.log("🔍 Checking if email exists:", email.toLowerCase().trim());
-        console.log("🔍 Found user in DB:", existingUser);
-        
+        // Ensure email is lowercase and unique
+        const emailToCheck = email.toLowerCase().trim();
+        console.log('🔍 Checking if email exists:', emailToCheck);
+
+        const existingUser = await User.findOne({ email: emailToCheck });
+        console.log('🔍 Found user in DB:', existingUser);
+
         if (existingUser) {
             return res.status(400).json({ error: 'Email already registered' });
-        }
-
-        // Ensure JWT_SECRET exists
-        if (!process.env.JWT_SECRET) {
-            console.error('❌ JWT_SECRET is missing.');
-            return res.status(500).json({ error: 'Server misconfiguration' });
         }
 
         // Hash password safely
@@ -58,24 +52,19 @@ router.post('/register', async (req, res) => {
         }
 
         // Create user
-        const user = new User({ 
-            email: email.toLowerCase().trim(), // ✅ Convert email to lowercase before saving
-            password: hashedPassword,
-            name,
-            role: 'user'
-        });
+        const user = new User({ email: emailToCheck, password: hashedPassword, name, role: 'user' });
 
         try {
+            console.log('📝 Attempting to save user:', user);
             await user.save();
+            console.log('✅ User successfully saved:', user._id);
         } catch (err) {
-            if (err.code === 11000) { // ✅ Handle duplicate email error from MongoDB
-                return res.status(400).json({ error: 'Email already registered' });
+            console.error('❌ Error saving user to DB:', err);
+            if (err.code === 11000) {
+                return res.status(400).json({ error: 'Email already registered (Duplicate Key)' });
             }
-            console.error('❌ Database save error:', err);
-            return res.status(500).json({ error: 'Database error' });
+            return res.status(500).json({ error: 'Database save failed' });
         }
-
-        console.log('✅ User registered:', user._id);
 
         // Create JWT Token
         const token = jwt.sign(
