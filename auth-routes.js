@@ -33,6 +33,10 @@ router.post('/register', async (req, res) => {
 
         // Ensure email is case-insensitive unique
         const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+        
+        console.log("🔍 Checking if email exists:", email.toLowerCase().trim());
+        console.log("🔍 Found user in DB:", existingUser);
+        
         if (existingUser) {
             return res.status(400).json({ error: 'Email already registered' });
         }
