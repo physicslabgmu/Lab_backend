@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // ✅ Ensure the unique index is created properly
-// userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ email: 1 }, { unique: true });
 
 const User = mongoose.model('User', userSchema);
 module.exports = User;
@@ -30,7 +30,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        // Ensure email is lowercase and unique
+        // Ensure email is case-insensitive unique
         const emailToCheck = email.toLowerCase().trim();
         console.log('🔍 Checking if email exists:', emailToCheck);
 
@@ -61,7 +61,7 @@ router.post('/register', async (req, res) => {
         } catch (err) {
             console.error('❌ Error saving user to DB:', err);
             if (err.code === 11000) {
-                return res.status(400).json({ error: 'Email already registered (Duplicate Key)' });
+                return res.status(400).json({ error: 'Email already registered (Duplicate Key Issue)' });
             }
             return res.status(500).json({ error: 'Database save failed' });
         }
