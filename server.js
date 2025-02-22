@@ -159,7 +159,14 @@ Example responses:
 "Here are resources for the pendulum experiment:
 PHY 161:
 🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
-📄 [pendulum_guide.pdf] - Detailed experiment instructions"`;
+📄 [pendulum_guide.pdf] - Detailed experiment instructions"
+
+Make sure you give the correct links from file_urls.txt 
+
+Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
+let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
+
+Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
 
 // Configure CORS
 app.use(cors({
