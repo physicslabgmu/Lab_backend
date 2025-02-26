@@ -10,36 +10,58 @@ const authRoutes = require('./auth-route');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
-// app.use(cors({
-//     origin: ['http://localhost:3000', 'https://lab-backend-nwko.onrender.com'],
-//     credentials: true
-// }));
-
+// Configure CORS with updated settings
 app.use(cors({
-    origin: '*',
+    origin: [
+        'http://localhost:3000',
+        'https://lab-backend-nwko.onrender.com',
+        'https://physicslabgmu.github.io'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     credentials: true
 }));
 
+// Explicitly handle preflight requests
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.sendStatus(200);
+});
+
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve static files
-app.use(express.static(path.join(__dirname, '..'))); // Serve files from parent directory
+app.use(express.static(path.join(__dirname, '..')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-.then(() => console.log('Connected to MongoDB Atlas'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('Connected to MongoDB Atlas'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-// Setup auth routes
+// Use authentication routes with new prefix
 app.use('/api/auth', authRoutes);
 
 // Default route handler
 app.get('/', (req, res) => {
-    res.redirect('/signup.html');
+    res.status(200).json({ 
+        message: 'Server is running',
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+// Health check endpoint with enhanced info
+app.get('/health', (req, res) => {
+    const apiKeyPresent = !!process.env.GEMINI_API_KEY;
+    res.status(200).json({ 
+        status: 'healthy',
+        apiKeyPresent,
+        debug: process.env.DEBUG || true,
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Catch-all handler for non-existing routes
@@ -202,9 +224,6 @@ PHY 161:
 🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
 📄 [pendulum_guide.pdf] - Detailed experiment instructions"`;
 
-// Configure CORS
-// Removed CORS configuration here
-
 // Add rate limiting
 const requestQueue = [];
 let isProcessing = false;
@@ -296,20 +315,14 @@ User Query: ${prompt}`;
     }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-    const apiKeyPresent = !!process.env.GEMINI_API_KEY;
-    res.status(200).json({ 
-        status: 'healthy',
-        apiKeyPresent,
-        debug: DEBUG
-    });
-});
-
-// Error handling middleware
+// Error handlers with improved logging
 app.use((err, req, res, next) => {
-    console.error('Error:', err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+    console.error('Global error handler:', err);
+    res.status(500).json({ 
+        error: "Internal server error", 
+        details: err.message,
+        message: 'An unexpected error occurred. Please try again.'
+    });
 });
 
 // Process error handling
@@ -318,15 +331,22 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection:', err);
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// Start server
-const server = app.listen(port, () => {
+// Start server with enhanced error handling
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on port ${port}`);
-    console.log('Debug mode:', process.env.DEBUG || true);
+    console.log('Debug mode:', DEBUG);
     console.log('API Key present:', !!process.env.GEMINI_API_KEY);
+}).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js`);
+    } else {
+        console.error('Server error:', err);
+    }
+    process.exit(1);
 });
 
 // Graceful shutdown
