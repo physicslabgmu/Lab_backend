@@ -5,10 +5,46 @@ const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
-const authRoutes = require('./auth-routes');
+const authRoutes = require('./auth-route');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors({
+    origin: ['http://localhost:3000', 'https://lab-backend-nwko.onrender.com'],
+    credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, '..'))); // Serve files from parent directory
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB Atlas'))
+.catch(err => console.error('MongoDB connection error:', err));
+
+// Setup auth routes
+app.use('/auth', authRoutes);
+
+// Default route handler
+app.get('/', (req, res) => {
+    res.redirect('/signup.html');
+});
+
+// Catch-all handler for non-existing routes
+app.use((req, res, next) => {
+    if (req.accepts('html')) {
+        res.redirect('/signup.html');
+        return;
+    }
+    res.status(404).json({ error: 'Not found' });
+});
 
 // Initialize Google Gemini AI
 const apiKey = process.env.GEMINI_API_KEY;
@@ -159,45 +195,10 @@ Example responses:
 "Here are resources for the pendulum experiment:
 PHY 161:
 🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
-📄 [pendulum_guide.pdf] - Detailed experiment instructions"
-
-Make sure you give the correct links from file_urls.txt 
-
-Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
-let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
-
-Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
+📄 [pendulum_guide.pdf] - Detailed experiment instructions"`;
 
 // Configure CORS
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
-
-// ✅ Explicitly handle preflight requests
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.sendStatus(200);
-});
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '..')));
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
-
-// Use authentication routes
-app.use('/api/auth', authRoutes);
+// Removed CORS configuration here
 
 // Add rate limiting
 const requestQueue = [];
