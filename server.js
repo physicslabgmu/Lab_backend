@@ -47,6 +47,56 @@ mongoose.connect(process.env.MONGODB_URI)
 // Use authentication routes with new prefix
 app.use('/api/auth', authRoutes);
 
+// Chat endpoint with rate limiting
+app.post('/api/auth/chat', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        debugLog('Received chat request:', { prompt });
+
+        if (!prompt) {
+            return res.status(400).json({
+                error: true,
+                message: "Please enter a message"
+            });
+        }
+
+        // Get relevant URLs based on the query
+        const relevantUrls = getRelevantUrls(prompt);
+        debugLog('Found relevant URLs:', relevantUrls);
+        
+        // Create context-specific system prompt
+        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+When responding about physics topics:
+1. Include relevant course numbers (e.g., PHY 161, PHY 260)
+2. Reference specific lab equipment and setups
+3. Explain concepts clearly and concisely
+4. Link to relevant resources when available
+
+Here are some relevant resources for this query:
+${relevantUrls.join('\n')}
+
+User Query: ${prompt}`;
+
+        debugLog('Full prompt:', fullPrompt);
+
+        // Add request to queue
+        requestQueue.push({ prompt: fullPrompt, res });
+        
+        // Start processing if not already running
+        if (!isProcessing) {
+            processQueue();
+        }
+        
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({
+            error: true,
+            message: 'Server error occurred',
+            details: error.message
+        });
+    }
+});
+
 // Default route handler
 app.get('/', (req, res) => {
     res.status(200).json({ 
@@ -267,56 +317,6 @@ async function processQueue() {
         setTimeout(() => processQueue(), RATE_LIMIT_DELAY);
     }
 }
-
-// Chat endpoint with rate limiting
-app.post('/api/auth/chat', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        debugLog('Received chat request:', { prompt });
-
-        if (!prompt) {
-            return res.status(400).json({
-                error: true,
-                message: "Please enter a message"
-            });
-        }
-
-        // Get relevant URLs based on the query
-        const relevantUrls = getRelevantUrls(prompt);
-        debugLog('Found relevant URLs:', relevantUrls);
-        
-        // Create context-specific system prompt
-        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
-When responding about physics topics:
-1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-2. Reference specific lab equipment and setups
-3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
-
-Here are some relevant resources for this query:
-${relevantUrls.join('\n')}
-
-User Query: ${prompt}`;
-
-        debugLog('Full prompt:', fullPrompt);
-
-        // Add request to queue
-        requestQueue.push({ prompt: fullPrompt, res });
-        
-        // Start processing if not already running
-        if (!isProcessing) {
-            processQueue();
-        }
-        
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({
-            error: true,
-            message: 'Server error occurred',
-            details: error.message
-        });
-    }
-});
 
 // Error handlers with improved logging
 app.use((err, req, res, next) => {
