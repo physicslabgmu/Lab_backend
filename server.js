@@ -14,12 +14,14 @@ const port = process.env.PORT || 3000;
 app.use(cors({
     origin: [
         'http://localhost:3000',
+        'http://127.0.0.1:5500',
         'https://lab-backend-nwko.onrender.com',
         'https://physicslabgmu.github.io'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true
+    credentials: true,
+    maxAge: 86400 // Cache preflight request for 24 hours
 }));
 
 // Explicitly handle preflight requests
@@ -28,6 +30,7 @@ app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Max-Age', '86400'); // Cache preflight request for 24 hours
     res.sendStatus(200);
 });
 
