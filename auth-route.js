@@ -90,7 +90,7 @@ async function sendOTPEmail(email, otp) {
                 <div style="background-color: #f5f5f5; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
                     <h1 style="color: #006633; letter-spacing: 5px; margin: 0;">${otp}</h1>
                 </div>
-                <p style="color: #555; font-size: 14px;">This code will expire in 5 minutes.</p>
+                <p style="color: #555; font-size: 14px;">This code will expire in 1 minute.</p>
                 <p style="color: #555; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
             </div>
         `
@@ -125,10 +125,10 @@ router.post('/send-otp', async (req, res) => {
             return res.status(400).json({ error: 'Email is required' });
         }
 
-        // Check if email already exists and is verified
-        const existingUser = await User.findOne({ email: email.toLowerCase(), isVerified: true });
-        if (existingUser) {
-            return res.status(400).json({ error: 'Email already registered and verified' });
+        // For login verification, we don't need to check if the user is verified
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(400).json({ error: 'Email not registered' });
         }
 
         // Generate OTP
