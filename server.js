@@ -11,10 +11,18 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+// app.use(cors({
+//     origin: ['http://localhost:3000', 'https://lab-backend-nwko.onrender.com'],
+//     credentials: true
+// }));
+
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://lab-backend-nwko.onrender.com'],
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -27,7 +35,7 @@ mongoose.connect(process.env.MONGODB_URI)
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Setup auth routes
-app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 
 // Default route handler
 app.get('/', (req, res) => {
