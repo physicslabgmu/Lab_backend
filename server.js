@@ -22,10 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..'))); // Serve files from parent directory
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('Connected to MongoDB Atlas'))
 .catch(err => console.error('MongoDB connection error:', err));
 
@@ -301,30 +298,34 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Error handlers
+// Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Global error handler:', err);
-    res.status(500).json({ 
-        error: "Internal server error", 
-        details: err.message,
-        message: 'An unexpected error occurred. Please try again.'
-    });
+    console.error('Error:', err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+// Process error handling
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
 });
 
 // Start server
 const server = app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-    console.log('Debug mode:', DEBUG);
+    console.log('Debug mode:', process.env.DEBUG || true);
     console.log('API Key present:', !!process.env.GEMINI_API_KEY);
-}).on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js`);
-    } else {
-        console.error('Server error:', err);
-    }
-    process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('Received SIGTERM. Performing graceful shutdown...');
+    server.close(() => {
+        console.log('Server closed. Exiting process.');
+        process.exit(0);
+    });
 });
