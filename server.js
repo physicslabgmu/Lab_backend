@@ -269,7 +269,7 @@ async function processQueue() {
 }
 
 // Chat endpoint with rate limiting
-app.post('/api/chat', async (req, res) => {
+app.post('/api/auth/chat', async (req, res) => {
     try {
         const { prompt } = req.body;
         debugLog('Received chat request:', { prompt });
