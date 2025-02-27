@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
-const authRoutes = require('./auth-routes');
+const authRoutes = require('./auth-route');
 
 const app = express();
 const port = process.env.PORT || 3000;
