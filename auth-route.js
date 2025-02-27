@@ -119,16 +119,19 @@ const verifyToken = (req, res, next) => {
 // Send OTP for email verification
 router.post('/send-otp', async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, isRegistration } = req.body;
 
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
         }
 
-        // For login verification, we don't need to check if the user is verified
-        const user = await User.findOne({ email: email.toLowerCase() });
-        if (!user) {
-            return res.status(400).json({ error: 'Email not registered' });
+        // For login verification, check if user exists
+        // For registration, we don't need to check
+        if (!isRegistration) {
+            const user = await User.findOne({ email: email.toLowerCase() });
+            if (!user) {
+                return res.status(400).json({ error: 'Email not registered' });
+            }
         }
 
         // Generate OTP
