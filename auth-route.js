@@ -127,12 +127,12 @@ router.post('/send-otp', async (req, res) => {
 
         // For login verification, check if user exists
         // For registration, we don't need to check
-        if (!isRegistration) {
-            const user = await User.findOne({ email: email.toLowerCase() });
-            if (!user) {
-                return res.status(400).json({ error: 'Email not registered' });
-            }
-        }
+        // if (!isRegistration) {
+        //     const user = await User.findOne({ email: email.toLowerCase() });
+        //     if (!user) {
+        //         return res.status(400).json({ error: 'Email not registered' });
+        //     }
+        // }
 
         // Generate OTP
         const otp = generateOTP();
