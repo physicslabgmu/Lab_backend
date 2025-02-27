@@ -10,6 +10,10 @@ const authRoutes = require('./auth-route');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const DEBUG = process.env.DEBUG === 'true';
+
 // Configure CORS with updated settings
 app.use(cors({
     origin: [
@@ -60,17 +64,16 @@ app.post('/api/auth/chat', async (req, res) => {
             });
         }
 
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is not set in environment variables');
+        }
+
         // Get relevant URLs based on the query
         const relevantUrls = getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
         // Create context-specific system prompt
-        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
-When responding about physics topics:
-1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-2. Reference specific lab equipment and setups
-3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
+        const fullPrompt = `${baseSystemPrompt}
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -91,7 +94,7 @@ User Query: ${prompt}`;
         console.error('Server error:', error);
         res.status(500).json({
             error: true,
-            message: 'Server error occurred',
+            message: 'An error occurred while processing your request. Please try again.',
             details: error.message
         });
     }
@@ -126,16 +129,7 @@ app.use((req, res, next) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-// Initialize Google Gemini AI
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not set in environment variables');
-}
-const genAI = new GoogleGenerativeAI(apiKey);
-
 // Add debugging configuration
-const DEBUG = process.env.DEBUG || true;
-
 function debugLog(...args) {
     if (DEBUG) {
         console.log('[DEBUG]', ...args);
@@ -290,15 +284,19 @@ async function processQueue() {
     const { prompt, res } = requestQueue.shift();
     
     try {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is not set in environment variables');
+        }
+
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const result = await model.generateContent(prompt);
         
-        if (!result) {
-            throw new Error('No result from Gemini API');
+        if (!result || !result.response) {
+            throw new Error('No response from Gemini API');
         }
         
-        const response = await result.response;
-        const text = response.text();
+        const text = result.response.text();
+        debugLog('Generated response:', text);
         
         res.json({ 
             message: text,
@@ -308,7 +306,7 @@ async function processQueue() {
         console.error('Error processing queue item:', error);
         res.status(500).json({
             error: true,
-            message: 'Please wait a moment and try again.',
+            message: 'An error occurred while processing your request. Please try again.',
             details: error.message
         });
     } finally {
