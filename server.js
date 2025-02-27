@@ -176,11 +176,10 @@ app.use(cors({
     credentials: true
 }));
 
-
 // ✅ Explicitly handle preflight requests
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Accedss-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.sendStatus(200);
@@ -199,48 +198,57 @@ mongoose.connect(process.env.MONGODB_URI)
 // Use authentication routes
 app.use('/api/auth', authRoutes);
 
-// Add rate limiting
-const requestQueue = [];
-let isProcessing = false;
-const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests
-
-// Function to process the queue
-async function processQueue() {
-    if (isProcessing || requestQueue.length === 0) return;
-    
-    isProcessing = true;
-    const { prompt, res } = requestQueue.shift();
-    
+// Chat endpoint with rate limiting
+app.post('/api/auth/chat', async (req, res) => {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(prompt);
+        const { prompt } = req.body;
+        debugLog('Received chat request:', { prompt });
+
+        if (!prompt) {
+            return res.status(400).json({
+                error: true,
+                message: "Please enter a message"
+            });
+        }
+
+        // Get relevant URLs based on the query
+        const relevantUrls = getRelevantUrls(prompt);
+        debugLog('Found relevant URLs:', relevantUrls);
         
-        if (!result) {
-            throw new Error('No result from Gemini API');
+        // Create context-specific system prompt
+        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+When responding about physics topics:
+1. Include relevant course numbers (e.g., PHY 161, PHY 260)
+2. Reference specific lab equipment and setups
+3. Explain concepts clearly and concisely
+4. Link to relevant resources when available
+
+Here are some relevant resources for this query:
+${relevantUrls.join('\n')}
+
+User Query: ${prompt}`;
+
+        debugLog('Full prompt:', fullPrompt);
+
+        // Add request to queue
+        requestQueue.push({ prompt: fullPrompt, res });
+        
+        // Start processing if not already running
+        if (!isProcessing) {
+            processQueue();
         }
         
-        const response = await result.response;
-        const text = response.text();
-        
-        res.json({ 
-            message: text,
-            success: true 
-        });
     } catch (error) {
-        console.error('Error processing queue item:', error);
+        console.error('Server error:', error);
         res.status(500).json({
             error: true,
-            message: 'Please wait a moment and try again.',
+            message: 'Server error occurred',
             details: error.message
         });
-    } finally {
-        isProcessing = false;
-        // Wait before processing next request
-        setTimeout(() => processQueue(), RATE_LIMIT_DELAY);
     }
-}
+});
 
-// Chat endpoint with rate limiting
+// Chat endpoint with rate limiting (keeping the old endpoint for backward compatibility)
 app.post('/api/chat', async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -289,6 +297,47 @@ User Query: ${prompt}`;
         });
     }
 });
+
+// Add rate limiting
+const requestQueue = [];
+let isProcessing = false;
+const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests
+
+// Function to process the queue
+async function processQueue() {
+    if (isProcessing || requestQueue.length === 0) return;
+    
+    isProcessing = true;
+    const { prompt, res } = requestQueue.shift();
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(prompt);
+        
+        if (!result) {
+            throw new Error('No result from Gemini API');
+        }
+        
+        const response = await result.response;
+        const text = response.text();
+        
+        res.json({ 
+            message: text,
+            success: true 
+        });
+    } catch (error) {
+        console.error('Error processing queue item:', error);
+        res.status(500).json({
+            error: true,
+            message: 'Please wait a moment and try again.',
+            details: error.message
+        });
+    } finally {
+        isProcessing = false;
+        // Wait before processing next request
+        setTimeout(() => processQueue(), RATE_LIMIT_DELAY);
+    }
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
