@@ -5,131 +5,21 @@ const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
-const authRoutes = require('./auth-route');
+const authRoutes = require('./auth-routes');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const DEBUG = process.env.DEBUG === 'true';
-
-// Configure CORS with updated settings
-app.use(cors({
-    origin: [
-        'http://localhost:3000',
-        'http://127.0.0.1:5500',
-        'https://lab-backend-nwko.onrender.com',
-        'https://physicslabgmu.github.io'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true,
-    maxAge: 86400 // Cache preflight request for 24 hours
-}));
-
-// Explicitly handle preflight requests
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Max-Age', '86400'); // Cache preflight request for 24 hours
-    res.sendStatus(200);
-});
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '..')));
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch(err => console.error('MongoDB connection error:', err));
-
-// Use authentication routes with new prefix
-app.use('/api/auth', authRoutes);
-
-// Chat endpoint with rate limiting
-app.post('/api/auth/chat', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        debugLog('Received chat request:', { prompt });
-
-        if (!prompt) {
-            return res.status(400).json({
-                error: true,
-                message: "Please enter a message"
-            });
-        }
-
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY is not set in environment variables');
-        }
-
-        // Get relevant URLs based on the query
-        const relevantUrls = getRelevantUrls(prompt);
-        debugLog('Found relevant URLs:', relevantUrls);
-        
-        // Create context-specific system prompt
-        const fullPrompt = `${baseSystemPrompt}
-
-Here are some relevant resources for this query:
-${relevantUrls.join('\n')}
-
-User Query: ${prompt}`;
-
-        debugLog('Full prompt:', fullPrompt);
-
-        // Add request to queue
-        requestQueue.push({ prompt: fullPrompt, res });
-        
-        // Start processing if not already running
-        if (!isProcessing) {
-            processQueue();
-        }
-        
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({
-            error: true,
-            message: 'An error occurred while processing your request. Please try again.',
-            details: error.message
-        });
-    }
-});
-
-// Default route handler
-app.get('/', (req, res) => {
-    res.status(200).json({ 
-        message: 'Server is running',
-        environment: process.env.NODE_ENV || 'development'
-    });
-});
-
-// Health check endpoint with enhanced info
-app.get('/health', (req, res) => {
-    const apiKeyPresent = !!process.env.GEMINI_API_KEY;
-    res.status(200).json({ 
-        status: 'healthy',
-        apiKeyPresent,
-        debug: process.env.DEBUG || true,
-        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Catch-all handler for non-existing routes
-app.use((req, res, next) => {
-    if (req.accepts('html')) {
-        res.redirect('/signup.html');
-        return;
-    }
-    res.status(404).json({ error: 'Not found' });
-});
+// Initialize Google Gemini AI
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not set in environment variables');
+}
+const genAI = new GoogleGenerativeAI(apiKey);
 
 // Add debugging configuration
+const DEBUG = process.env.DEBUG || true;
+
 function debugLog(...args) {
     if (DEBUG) {
         console.log('[DEBUG]', ...args);
@@ -269,7 +159,45 @@ Example responses:
 "Here are resources for the pendulum experiment:
 PHY 161:
 🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
-📄 [pendulum_guide.pdf] - Detailed experiment instructions"`;
+📄 [pendulum_guide.pdf] - Detailed experiment instructions"
+
+Make sure you give the correct links from file_urls.txt 
+
+Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
+let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
+
+Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
+
+// Configure CORS
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+
+
+// ✅ Explicitly handle preflight requests
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Accedss-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.sendStatus(200);
+});
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, '..')));
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Use authentication routes
+app.use('/api/auth', authRoutes);
 
 // Add rate limiting
 const requestQueue = [];
@@ -284,19 +212,15 @@ async function processQueue() {
     const { prompt, res } = requestQueue.shift();
     
     try {
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY is not set in environment variables');
-        }
-
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const result = await model.generateContent(prompt);
         
-        if (!result || !result.response) {
-            throw new Error('No response from Gemini API');
+        if (!result) {
+            throw new Error('No result from Gemini API');
         }
         
-        const text = result.response.text();
-        debugLog('Generated response:', text);
+        const response = await result.response;
+        const text = response.text();
         
         res.json({ 
             message: text,
@@ -306,7 +230,7 @@ async function processQueue() {
         console.error('Error processing queue item:', error);
         res.status(500).json({
             error: true,
-            message: 'An error occurred while processing your request. Please try again.',
+            message: 'Please wait a moment and try again.',
             details: error.message
         });
     } finally {
@@ -316,7 +240,67 @@ async function processQueue() {
     }
 }
 
-// Error handlers with improved logging
+// Chat endpoint with rate limiting
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        debugLog('Received chat request:', { prompt });
+
+        if (!prompt) {
+            return res.status(400).json({
+                error: true,
+                message: "Please enter a message"
+            });
+        }
+
+        // Get relevant URLs based on the query
+        const relevantUrls = getRelevantUrls(prompt);
+        debugLog('Found relevant URLs:', relevantUrls);
+        
+        // Create context-specific system prompt
+        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+When responding about physics topics:
+1. Include relevant course numbers (e.g., PHY 161, PHY 260)
+2. Reference specific lab equipment and setups
+3. Explain concepts clearly and concisely
+4. Link to relevant resources when available
+
+Here are some relevant resources for this query:
+${relevantUrls.join('\n')}
+
+User Query: ${prompt}`;
+
+        debugLog('Full prompt:', fullPrompt);
+
+        // Add request to queue
+        requestQueue.push({ prompt: fullPrompt, res });
+        
+        // Start processing if not already running
+        if (!isProcessing) {
+            processQueue();
+        }
+        
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({
+            error: true,
+            message: 'Server error occurred',
+            details: error.message
+        });
+    }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    const apiKeyPresent = !!process.env.GEMINI_API_KEY;
+    res.status(200).json({ 
+        status: 'healthy',
+        apiKeyPresent,
+        debug: DEBUG
+    });
+});
+
+// Error handlers
 app.use((err, req, res, next) => {
     console.error('Global error handler:', err);
     res.status(500).json({ 
@@ -326,18 +310,12 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Process error handling
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-    process.exit(1);
-});
-
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// Start server with enhanced error handling
-const server = app.listen(port, '0.0.0.0', () => {
+// Start server
+const server = app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log('Debug mode:', DEBUG);
     console.log('API Key present:', !!process.env.GEMINI_API_KEY);
@@ -348,13 +326,4 @@ const server = app.listen(port, '0.0.0.0', () => {
         console.error('Server error:', err);
     }
     process.exit(1);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('Received SIGTERM. Performing graceful shutdown...');
-    server.close(() => {
-        console.log('Server closed. Exiting process.');
-        process.exit(0);
-    });
 });
