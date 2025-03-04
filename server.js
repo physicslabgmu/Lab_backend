@@ -326,7 +326,10 @@ async function processQueue() {
         const transformedText = transformLinksToIcons(text);
         
         res.json({ 
-            message: text,
+            // message: text,
+            // success: true 
+            message: transformedText,
+            styles: linkIconStyle + pdfIconStyle,
             success: true 
         });
     } catch (error) {
