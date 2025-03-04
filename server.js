@@ -352,6 +352,8 @@ function transformLinksToIcons(text) {
     return text.replace(urlRegex, (url) => {
         if (url.toLowerCase().endsWith('.pdf')) {
             return `<a href='${url}' target='_blank'><i class='pdf-icon'></i></a>`;
+        } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>`;
         } else {
             return `<a href='${url}' target='_blank'><i class='link-icon'></i></a>`;
         }
@@ -381,9 +383,23 @@ const pdfIconStyle = `<style>
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
+    border: 1px solid #FF0000;
+    border-radius: 3px;
+    padding: 2px;
 }
 </style>`;
 
+// Add CSS for the image link
+const imageLinkStyle = `<style>
+.image-link {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+    cursor: pointer;
+}
+</style>`;
 
 // Health check endpoint
 app.get('/health', (req, res) => {
