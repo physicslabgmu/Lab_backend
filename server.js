@@ -140,7 +140,7 @@ const baseSystemPrompt = `You are a helpful assistant for the GMU Physics Lab. Y
 
 When responding to queries:
 1. Always provide relevant URLs from the database when available
-2. Format URLs with appropriate icons (🖼️ for images, 📄 for PDFs)
+2. Always format URLs with appropriate icons (🖼️ for images, 📄 for PDFs) and don't give the raw links to the user use the icons represent them.
 3. Group resources by course when possible
 4. If a specific course is mentioned, focus on that course's resources first
 5. For equipment queries, include images of the equipment when available
