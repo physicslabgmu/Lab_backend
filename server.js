@@ -139,7 +139,7 @@ function getRelevantUrls(query) {
 const baseSystemPrompt = `You are a helpful assistant for the GMU Physics Lab. Your role is to help students and faculty find resources and information about physics lab experiments and equipment.
 
 When responding to queries:
-1. Always provide relevant URLs from the database when available
+1. Always provide relevant URLs from the database when available and do not add any special characters at the end of the link as it will not work.
 2. Always format URLs with appropriate icons (🖼️ for images, 📄 for PDFs) and don't give the raw links to the user use the icons represent them.
 3. Group resources by course when possible
 4. If a specific course is mentioned, focus on that course's resources first
@@ -356,8 +356,19 @@ function transformLinksToIcons(text) {
         return match;
     });
 
+//     const urlRegex = /(https?:\/\/[^\s\)]+)/g; // Avoid capturing the closing parenthesis
+// return text.replace(urlRegex, (url) => {  // Fixed the arrow function syntax
+//     if (url.toLowerCase().endsWith('.pdf')) {
+//         return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
+//     } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+//         return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>`;
+//     } else {
+//         return `<a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>`;
+//     }
+// });
+
     // Then handle any remaining URLs
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlRegex = /(https?:\/\/[^\s\)]+)/g;
     return text.replace(urlRegex, (url) => {
         if (url.toLowerCase().endsWith('.pdf')) {
             return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
