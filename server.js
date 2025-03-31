@@ -149,6 +149,7 @@ When responding to queries:
 8. Always include course numbers in your responses (e.g., "For PHY 261...")
 9. Explain what each resource contains or shows
 10. If no specific resources are found, suggest related topics or courses
+11. Display the images from the url's extracted from file_urls.txt and based on the user query give an appropriate image to the user in the chatbox.
 
 Example responses:
 "For PHY 261 AC Circuits, here are some helpful resources:
