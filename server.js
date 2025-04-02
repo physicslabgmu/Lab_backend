@@ -216,13 +216,20 @@ app.post('/api/auth/chat', async (req, res) => {
         const relevantUrls = getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
-        // Create context-specific system prompt
+        // Create context-specific system prompt with updated instructions
         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
 When responding about physics topics:
 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
 2. Reference specific lab equipment and setups
 3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
+4. Provide resources using SIMPLE markdown format only
+
+IMPORTANT: When providing links to resources, use only the following format:
+- For images: 🖼️ [filename](http://example.com/image.jpg)
+- For PDFs: 📄 [filename](http://example.com/document.pdf)
+- For other links: [name](http://example.com/link)
+
+DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -266,13 +273,20 @@ app.post('/api/chat', async (req, res) => {
         const relevantUrls = getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
-        // Create context-specific system prompt
+        // Create context-specific system prompt with updated instructions
         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
 When responding about physics topics:
 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
 2. Reference specific lab equipment and setups
 3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
+4. Provide resources using SIMPLE markdown format only
+
+IMPORTANT: When providing links to resources, use only the following format:
+- For images: 🖼️ [filename](http://example.com/image.jpg)
+- For PDFs: 📄 [filename](http://example.com/document.pdf)
+- For other links: [name](http://example.com/link)
+
+DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -304,6 +318,42 @@ const requestQueue = [];
 let isProcessing = false;
 const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests
 
+// Function to pre-process Gemini's output and fix formatting issues
+function preprocessGeminiOutput(text) {
+    // Fix common issues with Gemini's output
+    
+    // Replace any HTML tags that might have been generated directly by the model
+    text = text.replace(/<img[^>]*>/g, ''); // Remove any direct img tags
+    text = text.replace(/<a[^>]*>(.*?)<\/a>/g, '$1'); // Remove any direct anchor tags but keep their content
+    
+    // Fix cases where markdown and HTML are mixed
+    text = text.replace(/\[(.*?)\](\(<a href='.*?'.*?<\/a>\))/g, '$1');
+    
+    // Fix PDF links with parentheses in filenames
+    text = text.replace(/(https?:\/\/[^\s)]+)\((\d+)\)(\.pdf)/g, '$1$2$3');
+    
+    return text;
+}
+
+// Debug function to see what HTML is being generated for images
+function debugImageTransformation(text) {
+    // Find all image links
+    const imageMatches = text.match(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g) || [];
+    
+    debugLog('Found image matches:', imageMatches);
+    
+    // Test transformation of one image link
+    if (imageMatches.length > 0) {
+        const sample = imageMatches[0];
+        const transformed = sample.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+        });
+        
+        debugLog('Original image link:', sample);
+        debugLog('Transformed to HTML:', transformed);
+    }
+}
+
 // Function to process the queue
 async function processQueue() {
     if (isProcessing || requestQueue.length === 0) return;
@@ -321,7 +371,10 @@ async function processQueue() {
         }
         
         const response = await result.response;
-        const text = response.text();
+        let text = response.text();
+
+        // Pre-process the text to fix common formatting issues
+        text = preprocessGeminiOutput(text);
 
         // Debug the transformation
         debugImageTransformation(text);
@@ -348,31 +401,32 @@ async function processQueue() {
     }
 }
 
-// Debug function to see what HTML is being generated for images
-function debugImageTransformation(text) {
-    // Find all image links
-    const imageMatches = text.match(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g) || [];
-    
-    debugLog('Found image matches:', imageMatches);
-    
-    // Test transformation of one image link
-    if (imageMatches.length > 0) {
-        const sample = imageMatches[0];
-        const transformed = sample.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
-        });
-        
-        debugLog('Original image link:', sample);
-        debugLog('Transformed to HTML:', transformed);
-    }
-}
-
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
-    // First, handle markdown-style image links with titles - 🖼️ [title](url) format
+    // First, check if the model is returning already malformed HTML mixed with markdown
+    // This pattern matches cases where the model tried to generate HTML inside markdown
+    text = text.replace(/\[(.*?)\]\(<a href='(.*?)' target='_blank'><img.*?<\/a>\)/g, (match, title, url) => {
+        return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+    });
+    
+    // Similar fix for PDF links with mixed formats
+    text = text.replace(/\[(.*?)\]\(<a href='(.*?)' target='_blank'><i class='.*?<\/a>\)/g, (match, title, url) => {
+        if (url.toLowerCase().endsWith('.pdf')) {
+            return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
+        }
+        return `<a href='${url}' target='_blank'><i class='link-icon'></i> ${title}</a>`;
+    });
+
+    // Fix broken PDF links with parentheses in URLs
+    text = text.replace(/(.*?)(\([\d]+\)\.pdf)\)/g, (match, base, pdfPart) => {
+        // This handles cases like "filename(1).pdf)" where the closing parenthesis is misplaced
+        return `${base}${pdfPart}`;
+    });
+
+    // Handle standard markdown image links with emoji - 🖼️ [title](url) format
     text = text.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
         const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
             return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
         }
         return match;
@@ -387,13 +441,25 @@ function transformLinksToIcons(text) {
         return match;
     });
 
-    // Then handle any remaining URLs
+    // Handle standard markdown links - [title](url) format
+    text = text.replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
+            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
+        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
+            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
+        } else {
+            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> ${title}</a>`;
+        }
+    });
+
+    // Then handle any remaining plain URLs
     const urlRegex = /(https?:\/\/[^\s)]+)/g;
     text = text.replace(urlRegex, (url) => {
         const cleanedUrl = cleanUrl(url);
         if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
             return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
             return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='Image' /></a>`;
         } else {
             return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
@@ -409,7 +475,7 @@ const linkIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z" fill="%23007BFF"/></svg>');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z' fill='%23007BFF'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
@@ -422,7 +488,7 @@ const pdfIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z" fill="%23FF0000"/></svg>');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z' fill='%23FF0000'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
