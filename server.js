@@ -73,7 +73,7 @@ function encodeURL(url) {
     const encodedFilename = encodeURIComponent(filename);
     
     // Return the full encoded URL
-    return `${basePath}/${encodedFilename}`;
+    return ${basePath}/${encodedFilename};
 }
 
 // Function to get relevant URLs based on query
@@ -126,8 +126,8 @@ function getRelevantUrls(query) {
         return sortedUrls.slice(0, 8).map(url => {
             const fileName = url.split('/').pop();
             const fileType = fileName.split('.').pop().toLowerCase();
-            const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
-            return `${icon} [${decodeURIComponent(fileName)}](${url})`;
+            const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼' : '•';
+            return ${icon} [${decodeURIComponent(fileName)}](${url});
         });
     } catch (error) {
         console.error('Error in getRelevantUrls:', error);
@@ -140,7 +140,7 @@ const baseSystemPrompt = `You are a helpful assistant for the GMU Physics Lab. Y
 
 When responding to queries:
 1. Always provide relevant URLs from the database when available and do not add any special characters at the end of the link as it will not work.
-2. Always format URLs with appropriate icons (🖼️ for images, 📄 for PDFs) and don't give the raw links to the user use the icons represent them.
+2. Always format URLs with appropriate icons (🖼 for images, 📄 for PDFs) and don't give the raw links to the user use the icons represent them.
 3. Group resources by course when possible
 4. If a specific course is mentioned, focus on that course's resources first
 5. For equipment queries, include images of the equipment when available
@@ -153,13 +153,13 @@ When responding to queries:
 
 Example responses:
 "For PHY 261 AC Circuits, here are some helpful resources:
-🖼️ [ac_circuit.jpg] - Shows the complete circuit setup
-🖼️ [pic2.jpg] - Detailed view of the components
+🖼 [ac_circuit.jpg] - Shows the complete circuit setup
+🖼 [pic2.jpg] - Detailed view of the components
 📄 [AC_Circuit_Manual.pdf] - Complete lab manual with instructions"
 
 "Here are resources for the pendulum experiment:
 PHY 161:
-🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
+🖼 [pendulum_setup.jpg] - Shows the proper pendulum setup
 📄 [pendulum_guide.pdf] - Detailed experiment instructions"
 
 Make sure you give the correct links from file_urls.txt 
@@ -167,7 +167,10 @@ Make sure you give the correct links from file_urls.txt
 Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
 let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
 
-Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
+Then we can send these 5 links to the LLM and ask it to form an answer using those.
+
+IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
+`;
 
 // Configure CORS
 app.use(cors({
@@ -216,15 +219,13 @@ app.post('/api/auth/chat', async (req, res) => {
         const relevantUrls = getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
-        // Create context-specific system prompt with updated instructions
+        // Create context-specific system prompt
         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
 When responding about physics topics:
 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
 2. Reference specific lab equipment and setups
 3. Explain concepts clearly and concisely
-4. Provide resources using SIMPLE markdown format only
-
-IMPORTANT: When responding to the user queries, display the content inside the link given and help the user to understand it there itself in the chatbot.
+4. Link to relevant resources when available
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -252,61 +253,56 @@ User Query: ${prompt}`;
 });
 
 // Chat endpoint with rate limiting (keeping the old endpoint for backward compatibility)
-// app.post('/api/chat', async (req, res) => {
-//     try {
-//         const { prompt } = req.body;
-//         debugLog('Received chat request:', { prompt });
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        debugLog('Received chat request:', { prompt });
 
-//         if (!prompt) {
-//             return res.status(400).json({
-//                 error: true,
-//                 message: "Please enter a message"
-//             });
-//         }
+        if (!prompt) {
+            return res.status(400).json({
+                error: true,
+                message: "Please enter a message"
+            });
+        }
 
-//         // Get relevant URLs based on the query
-//         const relevantUrls = getRelevantUrls(prompt);
-//         debugLog('Found relevant URLs:', relevantUrls);
+        // Get relevant URLs based on the query
+        const relevantUrls = getRelevantUrls(prompt);
+        debugLog('Found relevant URLs:', relevantUrls);
         
-//         // Create context-specific system prompt with updated instructions
-//         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
-// When responding about physics topics:
-// 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-// 2. Reference specific lab equipment and setups
-// 3. Explain concepts clearly and concisely
-// 4. Provide resources using SIMPLE markdown format only
+        // Create context-specific system prompt
+        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+When responding about physics topics:
+1. Include relevant course numbers (e.g., PHY 161, PHY 260)
+2. Reference specific lab equipment and setups
+3. Explain concepts clearly and concisely
+4. Link to relevant resources when available.
 
-// IMPORTANT: When providing links to resources, use only the following format:
-// - For images: 🖼️ [filename](http://example.com/image.jpg)
-// - For PDFs: 📄 [filename](http://example.com/document.pdf)
-// - For other links: [name](http://example.com/link)
+IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
 
-// DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
+Here are some relevant resources for this query:
+${relevantUrls.join('\n')}
 
-// Here are some relevant resources for this query:
-// ${relevantUrls.join('\n')}
+User Query: ${prompt}`;
 
-// User Query: ${prompt}`;
+        debugLog('Full prompt:', fullPrompt);
 
-//         debugLog('Full prompt:', fullPrompt);
-
-//         // Add request to queue
-//         requestQueue.push({ prompt: fullPrompt, res });
+        // Add request to queue
+        requestQueue.push({ prompt: fullPrompt, res });
         
-//         // Start processing if not already running
-//         if (!isProcessing) {
-//             processQueue();
-//         }
+        // Start processing if not already running
+        if (!isProcessing) {
+            processQueue();
+        }
         
-//     } catch (error) {
-//         console.error('Server error:', error);
-//         res.status(500).json({
-//             error: true,
-//             message: 'Server error occurred',
-//             details: error.message
-//         });
-//     }
-// });
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({
+            error: true,
+            message: 'Server error occurred',
+            details: error.message
+        });
+    }
+});
 
 // Add rate limiting
 const requestQueue = [];
@@ -390,14 +386,13 @@ function transformLinksToIcons(text) {
     });
 }
 
-
 // Add CSS for the link icon
 const linkIconStyle = `<style>
 .link-icon {
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z' fill='%23007BFF'/%3E%3C/svg%3E");
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z' fill='%23007BFF'/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
@@ -410,7 +405,7 @@ const pdfIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z' fill='%23FF0000'/%3E%3C/svg%3E");
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z' fill='%23FF0000'/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
@@ -425,17 +420,10 @@ const imageLinkStyle = `<style>
 .image-link {
     max-width: 100%;
     height: auto;
-    max-height: 300px; /* Limit height for better display */
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 5px;
-    margin: 5px 0;
-    display: block;
     cursor: pointer;
-}
-
-.image-link:hover {
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 </style>`;
 
@@ -465,12 +453,12 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start server
 const server = app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(Server running on port ${port});
     console.log('Debug mode:', DEBUG);
     console.log('API Key present:', !!process.env.GEMINI_API_KEY);
 }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js`);
+        console.error(Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js);
     } else {
         console.error('Server error:', err);
     }
