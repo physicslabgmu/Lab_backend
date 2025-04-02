@@ -127,7 +127,7 @@ function getRelevantUrls(query) {
             const fileName = url.split('/').pop();
             const fileType = fileName.split('.').pop().toLowerCase();
             const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼' : '•';
-            return ${icon} [${decodeURIComponent(fileName)}](${url});
+            return `${icon} [${decodeURIComponent(fileName)}](${url})`;
         });
     } catch (error) {
         console.error('Error in getRelevantUrls:', error);
@@ -226,6 +226,9 @@ When responding about physics topics:
 2. Reference specific lab equipment and setups
 3. Explain concepts clearly and concisely
 4. Link to relevant resources when available
+
+IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
+
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
