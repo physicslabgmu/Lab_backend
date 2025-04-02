@@ -224,12 +224,7 @@ When responding about physics topics:
 3. Explain concepts clearly and concisely
 4. Provide resources using SIMPLE markdown format only
 
-IMPORTANT: When providing links to resources, use only the following format:
-- For images: 🖼️ [filename](http://example.com/image.jpg)
-- For PDFs: 📄 [filename](http://example.com/document.pdf)
-- For other links: [name](http://example.com/link)
-
-DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
+IMPORTANT: When responding to the user queries, display the content inside the link given and help the user to understand it there itself in the chatbot.
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -257,102 +252,66 @@ User Query: ${prompt}`;
 });
 
 // Chat endpoint with rate limiting (keeping the old endpoint for backward compatibility)
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        debugLog('Received chat request:', { prompt });
+// app.post('/api/chat', async (req, res) => {
+//     try {
+//         const { prompt } = req.body;
+//         debugLog('Received chat request:', { prompt });
 
-        if (!prompt) {
-            return res.status(400).json({
-                error: true,
-                message: "Please enter a message"
-            });
-        }
+//         if (!prompt) {
+//             return res.status(400).json({
+//                 error: true,
+//                 message: "Please enter a message"
+//             });
+//         }
 
-        // Get relevant URLs based on the query
-        const relevantUrls = getRelevantUrls(prompt);
-        debugLog('Found relevant URLs:', relevantUrls);
+//         // Get relevant URLs based on the query
+//         const relevantUrls = getRelevantUrls(prompt);
+//         debugLog('Found relevant URLs:', relevantUrls);
         
-        // Create context-specific system prompt with updated instructions
-        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
-When responding about physics topics:
-1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-2. Reference specific lab equipment and setups
-3. Explain concepts clearly and concisely
-4. Provide resources using SIMPLE markdown format only
+//         // Create context-specific system prompt with updated instructions
+//         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+// When responding about physics topics:
+// 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
+// 2. Reference specific lab equipment and setups
+// 3. Explain concepts clearly and concisely
+// 4. Provide resources using SIMPLE markdown format only
 
-IMPORTANT: When providing links to resources, use only the following format:
-- For images: 🖼️ [filename](http://example.com/image.jpg)
-- For PDFs: 📄 [filename](http://example.com/document.pdf)
-- For other links: [name](http://example.com/link)
+// IMPORTANT: When providing links to resources, use only the following format:
+// - For images: 🖼️ [filename](http://example.com/image.jpg)
+// - For PDFs: 📄 [filename](http://example.com/document.pdf)
+// - For other links: [name](http://example.com/link)
 
-DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
+// DO NOT attempt to create HTML directly. DO NOT mix markdown and HTML in your responses.
 
-Here are some relevant resources for this query:
-${relevantUrls.join('\n')}
+// Here are some relevant resources for this query:
+// ${relevantUrls.join('\n')}
 
-User Query: ${prompt}`;
+// User Query: ${prompt}`;
 
-        debugLog('Full prompt:', fullPrompt);
+//         debugLog('Full prompt:', fullPrompt);
 
-        // Add request to queue
-        requestQueue.push({ prompt: fullPrompt, res });
+//         // Add request to queue
+//         requestQueue.push({ prompt: fullPrompt, res });
         
-        // Start processing if not already running
-        if (!isProcessing) {
-            processQueue();
-        }
+//         // Start processing if not already running
+//         if (!isProcessing) {
+//             processQueue();
+//         }
         
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({
-            error: true,
-            message: 'Server error occurred',
-            details: error.message
-        });
-    }
-});
+//     } catch (error) {
+//         console.error('Server error:', error);
+//         res.status(500).json({
+//             error: true,
+//             message: 'Server error occurred',
+//             details: error.message
+//         });
+//     }
+// });
 
 // Add rate limiting
 const requestQueue = [];
 let isProcessing = false;
 const RATE_LIMIT_DELAY = 2000; // 2 seconds between requests
-
-// Function to pre-process Gemini's output and fix formatting issues
-function preprocessGeminiOutput(text) {
-    // Fix common issues with Gemini's output
-    
-    // Replace any HTML tags that might have been generated directly by the model
-    text = text.replace(/<img[^>]*>/g, ''); // Remove any direct img tags
-    text = text.replace(/<a[^>]*>(.*?)<\/a>/g, '$1'); // Remove any direct anchor tags but keep their content
-    
-    // Fix cases where markdown and HTML are mixed
-    text = text.replace(/\[(.*?)\](\(<a href='.*?'.*?<\/a>\))/g, '$1');
-    
-    // Fix PDF links with parentheses in filenames
-    text = text.replace(/(https?:\/\/[^\s)]+)\((\d+)\)(\.pdf)/g, '$1$2$3');
-    
-    return text;
-}
-
-// Debug function to see what HTML is being generated for images
-function debugImageTransformation(text) {
-    // Find all image links
-    const imageMatches = text.match(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g) || [];
-    
-    debugLog('Found image matches:', imageMatches);
-    
-    // Test transformation of one image link
-    if (imageMatches.length > 0) {
-        const sample = imageMatches[0];
-        const transformed = sample.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
-        });
-        
-        debugLog('Original image link:', sample);
-        debugLog('Transformed to HTML:', transformed);
-    }
-}
 
 // Function to process the queue
 async function processQueue() {
@@ -371,20 +330,16 @@ async function processQueue() {
         }
         
         const response = await result.response;
-        let text = response.text();
+        const text = response.text();
 
-        // Pre-process the text to fix common formatting issues
-        text = preprocessGeminiOutput(text);
-
-        // Debug the transformation
-        debugImageTransformation(text);
-
-        // Transform links to icons
+         // Transform links to icons
         const transformedText = transformLinksToIcons(text);
         
         res.json({ 
+            // message: text,
+            // success: true 
             message: transformedText,
-            styles: linkIconStyle + pdfIconStyle + imageLinkStyle, // Include imageLinkStyle
+            styles: linkIconStyle + pdfIconStyle,
             success: true 
         });
     } catch (error) {
@@ -403,71 +358,38 @@ async function processQueue() {
 
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
-    // First, check if the model is returning already malformed HTML mixed with markdown
-    // This pattern matches cases where the model tried to generate HTML inside markdown
-    text = text.replace(/\[(.*?)\]\(<a href='(.*?)' target='_blank'><img.*?<\/a>\)/g, (match, title, url) => {
-        return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+    // First, handle markdown-style image links with titles
+    text = text.replace(/🖼 \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+        if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return <a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>;
+        }
+        return match;
     });
-    
-    // Similar fix for PDF links with mixed formats
-    text = text.replace(/\[(.*?)\]\(<a href='(.*?)' target='_blank'><i class='.*?<\/a>\)/g, (match, title, url) => {
+
+//     const urlRegex = /(https?:\/\/[^\s\)]+)/g; // Avoid capturing the closing parenthesis
+// return text.replace(urlRegex, (url) => {  // Fixed the arrow function syntax
+//     if (url.toLowerCase().endsWith('.pdf')) {
+//         return <a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>;
+//     } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+//         return <a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>;
+//     } else {
+//         return <a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>;
+//     }
+// });
+
+    // Then handle any remaining URLs
+    const urlRegex = /(https?:\/\/[^\s\)]+)/g;
+    return text.replace(urlRegex, (url) => {
         if (url.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
-        }
-        return `<a href='${url}' target='_blank'><i class='link-icon'></i> ${title}</a>`;
-    });
-
-    // Fix broken PDF links with parentheses in URLs
-    text = text.replace(/(.*?)(\([\d]+\)\.pdf)\)/g, (match, base, pdfPart) => {
-        // This handles cases like "filename(1).pdf)" where the closing parenthesis is misplaced
-        return `${base}${pdfPart}`;
-    });
-
-    // Handle standard markdown image links with emoji - 🖼️ [title](url) format
-    text = text.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
-            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
-        }
-        return match;
-    });
-
-    // Handle PDF links with icons - 📄 [title](url) format
-    text = text.replace(/📄\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
-        }
-        return match;
-    });
-
-    // Handle standard markdown links - [title](url) format
-    text = text.replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
-        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
-            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
+            return <a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>;
+        } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return <a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>;
         } else {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> ${title}</a>`;
+            return <a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>;
         }
     });
-
-    // Then handle any remaining plain URLs
-    const urlRegex = /(https?:\/\/[^\s)]+)/g;
-    text = text.replace(urlRegex, (url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|JPG|JPEG|PNG|GIF)$/)) {
-            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='Image' /></a>`;
-        } else {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
-        }
-    });
-
-    return text;
 }
+
 
 // Add CSS for the link icon
 const linkIconStyle = `<style>
