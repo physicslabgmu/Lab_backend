@@ -73,7 +73,7 @@ function encodeURL(url) {
     const encodedFilename = encodeURIComponent(filename);
     
     // Return the full encoded URL
-    return ${basePath}/${encodedFilename};
+    return `${basePath}/${encodedFilename}`;
 }
 
 // Function to get relevant URLs based on query
