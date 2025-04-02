@@ -323,14 +323,15 @@ async function processQueue() {
         const response = await result.response;
         const text = response.text();
 
-         // Transform links to icons
+        // Debug the transformation
+        debugImageTransformation(text);
+
+        // Transform links to icons
         const transformedText = transformLinksToIcons(text);
         
         res.json({ 
-            // message: text,
-            // success: true 
             message: transformedText,
-            styles: linkIconStyle + pdfIconStyle,
+            styles: linkIconStyle + pdfIconStyle + imageLinkStyle, // Include imageLinkStyle
             success: true 
         });
     } catch (error) {
@@ -347,38 +348,59 @@ async function processQueue() {
     }
 }
 
+// Debug function to see what HTML is being generated for images
+function debugImageTransformation(text) {
+    // Find all image links
+    const imageMatches = text.match(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g) || [];
+    
+    debugLog('Found image matches:', imageMatches);
+    
+    // Test transformation of one image link
+    if (imageMatches.length > 0) {
+        const sample = imageMatches[0];
+        const transformed = sample.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+        });
+        
+        debugLog('Original image link:', sample);
+        debugLog('Transformed to HTML:', transformed);
+    }
+}
+
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
-    // First, handle markdown-style image links with titles
-    text = text.replace(/🖼️ \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-        if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+    // First, handle markdown-style image links with titles - 🖼️ [title](url) format
+    text = text.replace(/🖼️\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
         }
         return match;
     });
 
-//     const urlRegex = /(https?:\/\/[^\s\)]+)/g; // Avoid capturing the closing parenthesis
-// return text.replace(urlRegex, (url) => {  // Fixed the arrow function syntax
-//     if (url.toLowerCase().endsWith('.pdf')) {
-//         return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-//     } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-//         return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>`;
-//     } else {
-//         return `<a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>`;
-//     }
-// });
+    // Handle PDF links with icons - 📄 [title](url) format
+    text = text.replace(/📄\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
+            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> ${title}</a>`;
+        }
+        return match;
+    });
 
     // Then handle any remaining URLs
-    const urlRegex = /(https?:\/\/[^\s\)]+)/g;
-    return text.replace(urlRegex, (url) => {
-        if (url.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-        } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>`;
+    const urlRegex = /(https?:\/\/[^\s)]+)/g;
+    text = text.replace(urlRegex, (url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
+            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
+        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='Image' /></a>`;
         } else {
-            return `<a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>`;
+            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
         }
     });
+
+    return text;
 }
 
 // Add CSS for the link icon
@@ -387,7 +409,7 @@ const linkIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z' fill='%23007BFF'/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z" fill="%23007BFF"/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
@@ -400,7 +422,7 @@ const pdfIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z' fill='%23FF0000'/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z" fill="%23FF0000"/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
@@ -415,10 +437,17 @@ const imageLinkStyle = `<style>
 .image-link {
     max-width: 100%;
     height: auto;
+    max-height: 300px; /* Limit height for better display */
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 5px;
+    margin: 5px 0;
+    display: block;
     cursor: pointer;
+}
+
+.image-link:hover {
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 </style>`;
 
