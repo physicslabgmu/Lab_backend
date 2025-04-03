@@ -456,12 +456,12 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start server
 const server = app.listen(port, () => {
-    console.log(Server running on port ${port});
+    console.log(`Server running on port ${port}`);
     console.log('Debug mode:', DEBUG);
     console.log('API Key present:', !!process.env.GEMINI_API_KEY);
 }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        console.error(Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js);
+        console.error(`Port ${port} is already in use. Try:\n1. Close existing server\n2. Run: npx kill-port ${port}\n3. Use different port: PORT=3001 node server.js`);
     } else {
         console.error('Server error:', err);
     }
