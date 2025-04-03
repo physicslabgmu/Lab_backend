@@ -126,7 +126,7 @@ function getRelevantUrls(query) {
         return sortedUrls.slice(0, 8).map(url => {
             const fileName = url.split('/').pop();
             const fileType = fileName.split('.').pop().toLowerCase();
-            const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼' : '•';
+            const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
             return `${icon} [${decodeURIComponent(fileName)}](${url})`;
         });
     } catch (error) {
@@ -139,8 +139,8 @@ function getRelevantUrls(query) {
 const baseSystemPrompt = `You are a helpful assistant for the GMU Physics Lab. Your role is to help students and faculty find resources and information about physics lab experiments and equipment.
 
 When responding to queries:
-1. Always provide relevant URLs from the database when available and do not add any special characters at the end of the link as it will not work.
-2. Always format URLs with appropriate icons (🖼 for images, 📄 for PDFs) and don't give the raw links to the user use the icons represent them.
+1. Always provide relevant URLs from the database when available
+2. Format URLs with appropriate icons (🖼️ for images, 📄 for PDFs)
 3. Group resources by course when possible
 4. If a specific course is mentioned, focus on that course's resources first
 5. For equipment queries, include images of the equipment when available
@@ -149,17 +149,16 @@ When responding to queries:
 8. Always include course numbers in your responses (e.g., "For PHY 261...")
 9. Explain what each resource contains or shows
 10. If no specific resources are found, suggest related topics or courses
-11. Display the images from the url's extracted from file_urls.txt and based on the user query give an appropriate image to the user in the chatbox.
 
 Example responses:
 "For PHY 261 AC Circuits, here are some helpful resources:
-🖼 [ac_circuit.jpg] - Shows the complete circuit setup
-🖼 [pic2.jpg] - Detailed view of the components
+🖼️ [ac_circuit.jpg] - Shows the complete circuit setup
+🖼️ [pic2.jpg] - Detailed view of the components
 📄 [AC_Circuit_Manual.pdf] - Complete lab manual with instructions"
 
 "Here are resources for the pendulum experiment:
 PHY 161:
-🖼 [pendulum_setup.jpg] - Shows the proper pendulum setup
+🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
 📄 [pendulum_guide.pdf] - Detailed experiment instructions"
 
 Make sure you give the correct links from file_urls.txt 
@@ -167,10 +166,7 @@ Make sure you give the correct links from file_urls.txt
 Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
 let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
 
-Then we can send these 5 links to the LLM and ask it to form an answer using those.
-
-IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
-`;
+Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
 
 // Configure CORS
 app.use(cors({
@@ -227,9 +223,6 @@ When responding about physics topics:
 3. Explain concepts clearly and concisely
 4. Link to relevant resources when available
 
-IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
-
-
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
 
@@ -278,9 +271,7 @@ When responding about physics topics:
 1. Include relevant course numbers (e.g., PHY 161, PHY 260)
 2. Reference specific lab equipment and setups
 3. Explain concepts clearly and concisely
-4. Link to relevant resources when available.
-
-IMPORTANT: Respond to the user according to the query in display the content which is inside the link extracted from file_urls.txt
+4. Link to relevant resources when available
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -320,8 +311,7 @@ async function processQueue() {
     const { prompt, res } = requestQueue.shift();
     
     try {
-        // gemini-pro 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const result = await model.generateContent(prompt);
         
         if (!result) {
@@ -330,15 +320,13 @@ async function processQueue() {
         
         const response = await result.response;
         const text = response.text();
-
-         // Transform links to icons
+        
+        // Transform links to icons
         const transformedText = transformLinksToIcons(text);
         
         res.json({ 
-            // message: text,
-            // success: true 
             message: transformedText,
-            styles: linkIconStyle + pdfIconStyle,
+            styles: linkIconStyle + pdfIconStyle + imageLinkStyle,
             success: true 
         });
     } catch (error) {
@@ -358,26 +346,15 @@ async function processQueue() {
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
     // First, handle markdown-style image links with titles
-    text = text.replace(/🖼 \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+    text = text.replace(/🖼️ \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
         if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
             return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
         }
         return match;
     });
 
-//     const urlRegex = /(https?:\/\/[^\s\)]+)/g; // Avoid capturing the closing parenthesis
-// return text.replace(urlRegex, (url) => {  // Fixed the arrow function syntax
-//     if (url.toLowerCase().endsWith('.pdf')) {
-//         return <a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>;
-//     } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-//         return <a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>;
-//     } else {
-//         return <a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>;
-//     }
-// });
-
     // Then handle any remaining URLs
-    const urlRegex = /(https?:\/\/[^\s\)]+)/g;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.replace(urlRegex, (url) => {
         if (url.toLowerCase().endsWith('.pdf')) {
             return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
