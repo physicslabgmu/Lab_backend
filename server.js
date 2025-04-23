@@ -243,6 +243,19 @@ async function processQueue() {
     }
 }
 
+function cleanUrl(url) {
+    if (!url) return '';
+    // Remove parentheses from start and end
+    url = url.replace(/^[\(\[]+/, '').replace(/[\)\]]+$/, '');
+    // Remove other trailing characters that aren't part of a valid URL
+    url = url.replace(/[\),\]\}>\s]+$/, '');
+    // Ensure it starts with http/https
+    if (!url.startsWith('http')) {
+        return '';
+    }
+    return url.trim();
+}
+
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
     // First, handle markdown-style image links with titles
