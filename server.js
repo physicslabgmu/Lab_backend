@@ -347,21 +347,23 @@ async function processQueue() {
 function transformLinksToIcons(text) {
     // First, handle markdown-style image links with titles
     text = text.replace(/🖼️ \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
-        if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='${title}' title='${title}' /></a>`;
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
         }
         return match;
     });
 
     // Then handle any remaining URLs
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlRegex = /(https?:\/\/[^\s)]+)/g;
     return text.replace(urlRegex, (url) => {
-        if (url.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${url}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-        } else if (url.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${url}' target='_blank'><img src='${url}' class='image-link' alt='Image' /></a>`;
+        const cleanedUrl = cleanUrl(url);
+        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
+            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
+        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
+            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='Image' /></a>`;
         } else {
-            return `<a href='${url}' target='_blank'><i class='link-icon'></i> Link</a>`;
+            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
         }
     });
 }
