@@ -234,7 +234,7 @@ User Query: ${prompt}`;
         debugLog('Full prompt:', fullPrompt);
 
         // Configure model
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
         const generationConfig = {
             temperature: 0.7,
