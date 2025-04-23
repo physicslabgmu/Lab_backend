@@ -147,6 +147,11 @@ mongoose.connect(process.env.MONGODB_URI)
 // Use authentication routes
 app.use('/api/auth', authRoutes);
 
+// Utility: Strip HTML tags from LLM output
+function stripHtmlTags(text) {
+    return text.replace(/<[^>]*>/g, '');
+}
+
 // Chat endpoint with rate limiting
 app.post('/api/auth/chat', async (req, res) => {
     try {
@@ -161,17 +166,18 @@ app.post('/api/auth/chat', async (req, res) => {
         }
 
         // Get relevant URLs based on the query
-        const relevantUrls = await getRelevantUrls(prompt);
+        const relevantUrls = getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
         // Create context-specific system prompt
-        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
+        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab.
 When responding about physics topics:
 1. If the user asks about an experiment or equipment, ALWAYS include relevant images in your response
 2. When showing images, describe what each image shows
-3. Format images with proper markdown: 🖼️ [Image Title](URL)
-4. Include course numbers when relevant (e.g., PHY 161, PHY 260)
-5. Be concise and clear in your explanations
+3. Always use this markdown format for images: 🖼️ [Image Title](https://link-to-image)
+4. Do NOT use HTML <img> or <a> tags, only markdown links
+5. Include course numbers when relevant (e.g., PHY 161, PHY 260)
+6. Be concise and clear in your explanations
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -221,8 +227,11 @@ async function processQueue() {
         const response = await result.response;
         const text = response.text();
         
+        // Sanitize before rendering:
+        const cleanResponse = stripHtmlTags(text);
+        
         // Transform links to icons
-        const transformedText = transformLinksToIcons(text);
+        const transformedText = transformLinksToIcons(cleanResponse);
         
         res.json({ 
             message: transformedText,
