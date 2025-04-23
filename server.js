@@ -216,11 +216,15 @@ app.post('/api/auth/chat', async (req, res) => {
 When responding about physics topics:
 1. ONLY use the provided URLs from our local database - do not suggest or use external URLs
 2. If the user asks about an experiment or equipment, include relevant images from the provided URLs
-3. When showing images, describe what each image shows
-4. Always use this markdown format for images: 🖼️ [Image Title](URL)
-5. Include course numbers when relevant (e.g., PHY 161, PHY 260)
-6. Be concise and clear in your explanations
-7. IMPORTANT: Only use URLs that are provided in the "relevant resources" section below
+3. When showing images:
+   - Use EXACTLY this format: 🖼️ [Image Title](URL)
+   - Do not modify the URLs
+   - Include the full URL exactly as provided
+   - Describe what each image shows after the link
+4. Include course numbers when relevant (e.g., PHY 161, PHY 260)
+5. Be concise and clear in your explanations
+6. IMPORTANT: Only use URLs that are provided in the "relevant resources" section below
+7. Do not create or suggest URLs - only use the exact URLs provided below
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -230,7 +234,7 @@ User Query: ${prompt}`;
         debugLog('Full prompt:', fullPrompt);
 
         // Configure model
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const generationConfig = {
             temperature: 0.7,
@@ -333,14 +337,20 @@ function cleanUrl(url) {
 function transformLinksToIcons(text) {
     if (!text) return '';
 
+    // Debug log the input text
+    debugLog('Input text to transform:', text);
+
     // First, handle markdown-style image links with titles
     text = text.replace(/🖼️\s*\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
         const cleanedUrl = cleanUrl(url);
         if (!cleanedUrl) return match;
         
+        // Debug log each image transformation
+        debugLog('Converting image:', { title, url: cleanedUrl });
+        
         return `
             <div class="chat-image-container">
-                <img src="${cleanedUrl}" class="chat-image" alt="${title}" title="${title}" />
+                <img src="${cleanedUrl}" class="chat-image" alt="${title}" title="${title}" loading="lazy" onerror="this.onerror=null;this.src='images/fallback.jpg';"/>
                 <div class="image-caption">${title}</div>
             </div>
         `;
@@ -357,11 +367,23 @@ function transformLinksToIcons(text) {
         return `<a href="${cleanedUrl}" target="_blank" rel="noopener noreferrer">${icon} ${title}</a>`;
     });
 
-    // Clean up any remaining HTML tags that might have been in the input
-    text = stripHtmlTags(text);
+    // If we still have plain text that looks like an image filename, try to convert it
+    text = text.replace(/\b([\w-]+\.(jpg|jpeg|png|gif))\b/gi, (match) => {
+        const title = match.split('.')[0].replace(/-/g, ' ');
+        const url = `https://physicslabgmu.github.io/Lab_db/images/${match}`;
+        return `
+            <div class="chat-image-container">
+                <img src="${url}" class="chat-image" alt="${title}" title="${title}" loading="lazy" onerror="this.onerror=null;this.src='images/fallback.jpg';"/>
+                <div class="image-caption">${title}</div>
+            </div>
+        `;
+    });
 
     // Add line breaks for better readability
     text = text.replace(/\n/g, '<br>');
+
+    // Debug log the final output
+    debugLog('Transformed text:', text);
 
     return text;
 }
