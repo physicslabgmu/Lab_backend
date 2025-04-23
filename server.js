@@ -94,22 +94,32 @@ async function getRelevantUrls(query) {
             return [];
         }
 
+        // Check if the query is specifically asking for images/pictures/photos
+        const isImageQuery = /\b(image|picture|photo|show|see|look|display)\b/i.test(query);
+        
         // Generate embedding for the query
         const queryEmbedding = await generateEmbedding(query);
         
-        // Calculate similarity scores
-        const scoredUrls = urlEmbeddings.map(urlData => ({
-            ...urlData,
-            score: cosineSimilarity(queryEmbedding, urlData.embedding)
-        }));
+        // Calculate similarity scores with additional weighting for images when requested
+        const scoredUrls = urlEmbeddings.map(urlData => {
+            const similarity = cosineSimilarity(queryEmbedding, urlData.embedding);
+            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(urlData.fileName);
+            const imageBonus = isImageQuery && isImage ? 0.3 : 0; // Boost image scores for image queries
+            
+            return {
+                ...urlData,
+                score: similarity + imageBonus
+            };
+        });
         
-        // Sort by similarity score and get top results
+        // Sort by score and get top results
         const sortedUrls = scoredUrls
             .sort((a, b) => b.score - a.score)
-            .slice(0, 5)  // Get top 5 results
-            .map(({ url, fileName }) => {
+            .slice(0, isImageQuery ? 3 : 5)  // Show fewer results if specifically asking for images
+            .map(({ url, fileName, score }) => {
                 const fileType = fileName.split('.').pop().toLowerCase();
                 const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
+                debugLog(`URL score: ${fileName} = ${score}`);
                 return `${icon} [${decodeURIComponent(fileName)}](${url})`;
             });
             
@@ -176,10 +186,11 @@ app.post('/api/auth/chat', async (req, res) => {
         // Create context-specific system prompt
         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
 When responding about physics topics:
-1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-2. Reference specific lab equipment and setups
-3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
+1. If the user asks about an experiment or equipment, ALWAYS include relevant images in your response
+2. When showing images, describe what each image shows
+3. Format images with proper markdown: 🖼️ [Image Title](URL)
+4. Include course numbers when relevant (e.g., PHY 161, PHY 260)
+5. Be concise and clear in your explanations
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
