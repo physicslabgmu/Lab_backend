@@ -6,6 +6,7 @@ const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth-route');
+const { pipeline } = require('@xenova/transformers');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,153 +21,110 @@ const genAI = new GoogleGenerativeAI(apiKey);
 // Add debugging configuration
 const DEBUG = process.env.DEBUG || true;
 
+// Store URL embeddings in memory
+let urlEmbeddings = [];
+let embedder = null;
+
 function debugLog(...args) {
     if (DEBUG) {
         console.log('[DEBUG]', ...args);
     }
 }
 
-// Load URLs from file_urls.txt
-function loadUrlDatabase() {
+// Function to generate embeddings for a text
+async function generateEmbedding(text) {
+    if (!embedder) {
+        // Initialize the embedder with a lightweight model
+        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    }
+    
+    const output = await embedder(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data);
+}
+
+// Function to compute cosine similarity between two vectors
+function cosineSimilarity(vecA, vecB) {
+    const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
+    const normA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
+    const normB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
+    return dotProduct / (normA * normB);
+}
+
+// Load URLs and generate embeddings
+async function loadUrlDatabase() {
     try {
         const data = fs.readFileSync('file_urls.txt', 'utf8');
-        return data
+        const urls = data
             .split('\n')
             .map(line => line.trim())
             .filter(line => line && line.startsWith('http') && !line.includes('logo'));
+
+        // Generate embeddings for each URL
+        debugLog('Generating embeddings for URLs...');
+        urlEmbeddings = await Promise.all(
+            urls.map(async url => {
+                // Extract meaningful text from URL for embedding
+                const urlParts = url.split('/');
+                const fileName = decodeURIComponent(urlParts[urlParts.length - 1]);
+                const category = urlParts[urlParts.length - 2] || '';
+                const embedText = `${category} ${fileName.replace(/\.[^/.]+$/, "")}`;
+                
+                const embedding = await generateEmbedding(embedText);
+                return {
+                    url,
+                    embedding,
+                    fileName,
+                    category
+                };
+            })
+        );
+        debugLog(`Generated embeddings for ${urlEmbeddings.length} URLs`);
+        return urls;
     } catch (error) {
         console.error('Error loading URL database:', error);
         return [];
     }
 }
 
-// Initialize URL database
-const urlDatabase = loadUrlDatabase();
-debugLog('Loaded URL database with ' + urlDatabase.length + ' URLs');
-
-// Function to clean and validate URLs
-function cleanUrl(url) {
-    if (!url) return '';
-    
-    // Remove parentheses from start and end
-    url = url.replace(/^[\(\[]+/, '').replace(/[\)\]]+$/, '');
-    
-    // Remove other trailing characters that aren't part of a valid URL
-    url = url.replace(/[\),\]\}>\s]+$/, '');
-    
-    // Ensure it starts with http/https
-    if (!url.startsWith('http')) {
-        return '';
-    }
-    
-    return url.trim();
-}
-
-// Function to encode URLs properly
-function encodeURL(url) {
-    // Split the URL into parts (before and after the filename)
-    const parts = url.split('/');
-    const filename = parts.pop(); // Get the last part (filename)
-    const basePath = parts.join('/'); // Rejoin the rest
-    
-    // Encode the filename part only
-    const encodedFilename = encodeURIComponent(filename);
-    
-    // Return the full encoded URL
-    return `${basePath}/${encodedFilename}`;
-}
-
-// Function to get relevant URLs based on query
-function getRelevantUrls(query) {
+// Function to get relevant URLs based on semantic search
+async function getRelevantUrls(query) {
     try {
-        const urls = urlDatabase;
-        if (!urls || urls.length === 0) {
-            console.error('URL database is empty');
+        if (urlEmbeddings.length === 0) {
+            console.error('URL embeddings database is empty');
             return [];
         }
 
-        query = query.toLowerCase();
-        const queryWords = query.split(/\s+/).filter(word => word.length > 2);
+        // Generate embedding for the query
+        const queryEmbedding = await generateEmbedding(query);
         
-        // Create a scoring system for URLs
-        const scoredUrls = urls.map(url => {
-            let score = 0;
-            const urlLower = url.toLowerCase();
-            const urlParts = url.split('/');
-            const coursePart = urlParts.find(part => /phy\d{3}/.test(part.toLowerCase())) || '';
-            const category = urlParts[urlParts.length - 2] || '';
-            const fileName = urlParts[urlParts.length - 1] || '';
-            
-            // Score based on course number match
-            const courseMatch = query.match(/phy\s*\d{3}/i);
-            if (courseMatch && urlLower.includes(courseMatch[0].replace(/\s+/g, '').toLowerCase())) {
-                score += 10;
-            }
-            
-            // Score based on category match
-            queryWords.forEach(word => {
-                if (category.toLowerCase().includes(word)) score += 5;
-                if (fileName.toLowerCase().includes(word)) score += 3;
-                if (urlLower.includes(word)) score += 1;
+        // Calculate similarity scores
+        const scoredUrls = urlEmbeddings.map(urlData => ({
+            ...urlData,
+            score: cosineSimilarity(queryEmbedding, urlData.embedding)
+        }));
+        
+        // Sort by similarity score and get top results
+        const sortedUrls = scoredUrls
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)  // Get top 5 results
+            .map(({ url, fileName }) => {
+                const fileType = fileName.split('.').pop().toLowerCase();
+                const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
+                return `${icon} [${decodeURIComponent(fileName)}](${url})`;
             });
             
-            // Bonus for PDF files (likely more informative)
-            if (fileName.toLowerCase().endsWith('.pdf')) score += 2;
-            
-            return { url, score };
-        });
-        
-        // Sort by score and get top results
-        const sortedUrls = scoredUrls
-            .filter(item => item.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .map(item => item.url);
-            
-        // Format URLs for display
-        return sortedUrls.slice(0, 8).map(url => {
-            const fileName = url.split('/').pop();
-            const fileType = fileName.split('.').pop().toLowerCase();
-            const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
-            return `${icon} [${decodeURIComponent(fileName)}](${url})`;
-        });
+        debugLog('Found relevant URLs:', sortedUrls);
+        return sortedUrls;
     } catch (error) {
         console.error('Error in getRelevantUrls:', error);
         return [];
     }
 }
 
-// Enhanced system prompt for better context
-const baseSystemPrompt = `You are a helpful assistant for the GMU Physics Lab. Your role is to help students and faculty find resources and information about physics lab experiments and equipment.
-
-When responding to queries:
-1. Always provide relevant URLs from the database when available
-2. Format URLs with appropriate icons (🖼️ for images, 📄 for PDFs)
-3. Group resources by course when possible
-4. If a specific course is mentioned, focus on that course's resources first
-5. For equipment queries, include images of the equipment when available
-6. For experiment queries, prioritize lab manuals and setup images
-7. If you can't find exact matches, suggest related resources
-8. Always include course numbers in your responses (e.g., "For PHY 261...")
-9. Explain what each resource contains or shows
-10. If no specific resources are found, suggest related topics or courses
-
-Example responses:
-"For PHY 261 AC Circuits, here are some helpful resources:
-🖼️ [ac_circuit.jpg] - Shows the complete circuit setup
-🖼️ [pic2.jpg] - Detailed view of the components
-📄 [AC_Circuit_Manual.pdf] - Complete lab manual with instructions"
-
-"Here are resources for the pendulum experiment:
-PHY 161:
-🖼️ [pendulum_setup.jpg] - Shows the proper pendulum setup
-📄 [pendulum_guide.pdf] - Detailed experiment instructions"
-
-Make sure you give the correct links from file_urls.txt 
-
-Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
-let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query. 
-
-Then we can send these 5 links to the LLM and ask it to form an answer using those.`;
+// Initialize URL database
+loadUrlDatabase().then(() => {
+    debugLog('Loaded URL database');
+});
 
 // Configure CORS
 app.use(cors({
@@ -212,57 +170,7 @@ app.post('/api/auth/chat', async (req, res) => {
         }
 
         // Get relevant URLs based on the query
-        const relevantUrls = getRelevantUrls(prompt);
-        debugLog('Found relevant URLs:', relevantUrls);
-        
-        // Create context-specific system prompt
-        const fullPrompt = `You are a helpful assistant for the GMU Physics Lab. 
-When responding about physics topics:
-1. Include relevant course numbers (e.g., PHY 161, PHY 260)
-2. Reference specific lab equipment and setups
-3. Explain concepts clearly and concisely
-4. Link to relevant resources when available
-
-Here are some relevant resources for this query:
-${relevantUrls.join('\n')}
-
-User Query: ${prompt}`;
-
-        debugLog('Full prompt:', fullPrompt);
-
-        // Add request to queue
-        requestQueue.push({ prompt: fullPrompt, res });
-        
-        // Start processing if not already running
-        if (!isProcessing) {
-            processQueue();
-        }
-        
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({
-            error: true,
-            message: 'Server error occurred',
-            details: error.message
-        });
-    }
-});
-
-// Chat endpoint with rate limiting (keeping the old endpoint for backward compatibility)
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        debugLog('Received chat request:', { prompt });
-
-        if (!prompt) {
-            return res.status(400).json({
-                error: true,
-                message: "Please enter a message"
-            });
-        }
-
-        // Get relevant URLs based on the query
-        const relevantUrls = getRelevantUrls(prompt);
+        const relevantUrls = await getRelevantUrls(prompt);
         debugLog('Found relevant URLs:', relevantUrls);
         
         // Create context-specific system prompt
