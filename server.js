@@ -114,9 +114,8 @@ function getRelevantUrls(query) {
 }
 
 // Initialize URL database
-loadUrlDatabase().then(() => {
-    debugLog('Loaded URL database');
-});
+loadUrlDatabase();
+debugLog('Loaded URL database');
 
 // Configure CORS
 app.use(cors({
