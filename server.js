@@ -179,6 +179,9 @@ When responding about physics topics:
 5. Include course numbers when relevant (e.g., PHY 161, PHY 260)
 6. Be concise and clear in your explanations
 
+Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
+let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query.
+
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
 
