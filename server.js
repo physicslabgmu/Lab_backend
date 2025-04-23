@@ -63,44 +63,76 @@ function loadUrlDatabase() {
 // Function to get relevant URLs based on keyword matching
 function getRelevantUrls(query) {
     try {
-        if (urlDatabase.length === 0) {
+        const urls = urlDatabase;
+        if (!urls || urls.length === 0) {
             console.error('URL database is empty');
             return [];
         }
 
-        const queryKeywords = extractKeywords(query);
-        const isImageQuery = /\b(image|picture|photo|show|see|look|display)\b/i.test(query);
+        // Convert query to lowercase for case-insensitive matching
+        const queryLower = query.toLowerCase();
         
-        // Score URLs based on keyword matches
-        const scoredUrls = urlDatabase.map(urlData => {
+        // Score each URL based on relevance
+        const scoredUrls = urls.map(url => {
             let score = 0;
             
-            // Score based on keyword matches
-            queryKeywords.forEach(keyword => {
-                if (urlData.keywords.includes(keyword)) score += 1;
-                if (urlData.category.toLowerCase().includes(keyword)) score += 0.5;
-            });
+            // Extract filename and remove extension
+            const fileName = url.split('/').pop().split('.')[0];
+            const fileNameLower = fileName.toLowerCase();
+            const fileType = url.split('.').pop().toLowerCase();
             
-            // Bonus for course number matches
-            const courseMatch = query.match(/phy\s*\d{3}/i);
-            if (courseMatch && urlData.url.toLowerCase().includes(courseMatch[0].replace(/\s+/g, ''))) {
-                score += 2;
+            // Check if query is asking for images
+            const isImageQuery = queryLower.includes('image') || 
+                               queryLower.includes('picture') || 
+                               queryLower.includes('photo') || 
+                               queryLower.includes('show me');
+            
+            // Boost score for image files when user asks for images
+            if (isImageQuery && ['jpg', 'jpeg', 'png', 'gif'].includes(fileType)) {
+                score += 5;
+            }
+
+            // Split filename into words and check each against query
+            const words = fileNameLower.split(/[-_\s]+/);
+            const queryWords = queryLower.split(/\s+/);
+            
+            queryWords.forEach(queryWord => {
+                // Direct word match in filename
+                if (words.some(word => word.includes(queryWord))) {
+                    score += 3;
+                }
+                
+                // Partial match in filename
+                if (fileNameLower.includes(queryWord)) {
+                    score += 2;
+                }
+                
+                // Match in full URL
+                if (url.toLowerCase().includes(queryWord)) {
+                    score += 1;
+                }
+            });
+
+            // Ensure image URLs are properly formatted
+            let formattedUrl = url;
+            if (!url.startsWith('http')) {
+                formattedUrl = `https://physicslabgmu.github.io/Lab_db${url.startsWith('/') ? '' : '/'}${url}`;
             }
             
-            // Bonus for images in image queries
-            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(urlData.fileName);
-            if (isImageQuery && isImage) score += 1;
-            
-            return { ...urlData, score };
+            return {
+                url: formattedUrl,
+                score,
+                fileName,
+                fileType
+            };
         });
-        
-        // Sort by score and get top results
+
+        // Sort by score (highest first) and take top results
         const sortedUrls = scoredUrls
             .filter(item => item.score > 0)
             .sort((a, b) => b.score - a.score)
-            .slice(0, isImageQuery ? 3 : 5)
-            .map(({ url, fileName }) => {
-                const fileType = fileName.split('.').pop().toLowerCase();
+            .slice(0, 5)
+            .map(({ url, fileName, fileType }) => {
                 const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
                 return `${icon} [${decodeURIComponent(fileName)}](${url})`;
             });
@@ -119,7 +151,7 @@ debugLog('Loaded URL database');
 
 // Configure CORS
 app.use(cors({
-    origin: '*',
+    origin: ['https://physicslabgmu.github.io', 'http://localhost:3000', 'http://localhost:5500'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -127,11 +159,18 @@ app.use(cors({
 
 // ✅ Explicitly handle preflight requests
 app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.sendStatus(200);
+    const origin = req.headers.origin;
+    if (origin === 'https://physicslabgmu.github.io' || 
+        origin === 'http://localhost:3000' || 
+        origin === 'http://localhost:5500') {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+        res.sendStatus(200);
+    } else {
+        res.sendStatus(403);
+    }
 });
 
 // Middleware
