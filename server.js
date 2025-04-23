@@ -6,7 +6,6 @@ const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth-route');
-const { pipeline } = require('@xenova/transformers');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -21,9 +20,8 @@ const genAI = new GoogleGenerativeAI(apiKey);
 // Add debugging configuration
 const DEBUG = process.env.DEBUG || true;
 
-// Store URL embeddings in memory
-let urlEmbeddings = [];
-let embedder = null;
+// Store URLs in memory
+let urlDatabase = [];
 
 function debugLog(...args) {
     if (DEBUG) {
@@ -31,95 +29,79 @@ function debugLog(...args) {
     }
 }
 
-// Function to generate embeddings for a text
-async function generateEmbedding(text) {
-    if (!embedder) {
-        // Initialize the embedder with a lightweight model
-        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-    }
-    
-    const output = await embedder(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data);
+// Function to extract keywords from text
+function extractKeywords(text) {
+    return text.toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 2);
 }
 
-// Function to compute cosine similarity between two vectors
-function cosineSimilarity(vecA, vecB) {
-    const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-    const normA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
-    const normB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
-    return dotProduct / (normA * normB);
-}
-
-// Load URLs and generate embeddings
-async function loadUrlDatabase() {
+// Load URLs from file
+function loadUrlDatabase() {
     try {
         const data = fs.readFileSync('file_urls.txt', 'utf8');
-        const urls = data
+        urlDatabase = data
             .split('\n')
             .map(line => line.trim())
-            .filter(line => line && line.startsWith('http') && !line.includes('logo'));
-
-        // Generate embeddings for each URL
-        debugLog('Generating embeddings for URLs...');
-        urlEmbeddings = await Promise.all(
-            urls.map(async url => {
-                // Extract meaningful text from URL for embedding
+            .filter(line => line && line.startsWith('http') && !line.includes('logo'))
+            .map(url => {
                 const urlParts = url.split('/');
                 const fileName = decodeURIComponent(urlParts[urlParts.length - 1]);
                 const category = urlParts[urlParts.length - 2] || '';
-                const embedText = `${category} ${fileName.replace(/\.[^/.]+$/, "")}`;
-                
-                const embedding = await generateEmbedding(embedText);
-                return {
-                    url,
-                    embedding,
-                    fileName,
-                    category
-                };
-            })
-        );
-        debugLog(`Generated embeddings for ${urlEmbeddings.length} URLs`);
-        return urls;
+                const keywords = extractKeywords(fileName + ' ' + category);
+                return { url, fileName, category, keywords };
+            });
+        debugLog(`Loaded ${urlDatabase.length} URLs`);
+        return urlDatabase;
     } catch (error) {
         console.error('Error loading URL database:', error);
         return [];
     }
 }
 
-// Function to get relevant URLs based on semantic search
-async function getRelevantUrls(query) {
+// Function to get relevant URLs based on keyword matching
+function getRelevantUrls(query) {
     try {
-        if (urlEmbeddings.length === 0) {
-            console.error('URL embeddings database is empty');
+        if (urlDatabase.length === 0) {
+            console.error('URL database is empty');
             return [];
         }
 
-        // Check if the query is specifically asking for images/pictures/photos
+        const queryKeywords = extractKeywords(query);
         const isImageQuery = /\b(image|picture|photo|show|see|look|display)\b/i.test(query);
         
-        // Generate embedding for the query
-        const queryEmbedding = await generateEmbedding(query);
-        
-        // Calculate similarity scores with additional weighting for images when requested
-        const scoredUrls = urlEmbeddings.map(urlData => {
-            const similarity = cosineSimilarity(queryEmbedding, urlData.embedding);
-            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(urlData.fileName);
-            const imageBonus = isImageQuery && isImage ? 0.3 : 0; // Boost image scores for image queries
+        // Score URLs based on keyword matches
+        const scoredUrls = urlDatabase.map(urlData => {
+            let score = 0;
             
-            return {
-                ...urlData,
-                score: similarity + imageBonus
-            };
+            // Score based on keyword matches
+            queryKeywords.forEach(keyword => {
+                if (urlData.keywords.includes(keyword)) score += 1;
+                if (urlData.category.toLowerCase().includes(keyword)) score += 0.5;
+            });
+            
+            // Bonus for course number matches
+            const courseMatch = query.match(/phy\s*\d{3}/i);
+            if (courseMatch && urlData.url.toLowerCase().includes(courseMatch[0].replace(/\s+/g, ''))) {
+                score += 2;
+            }
+            
+            // Bonus for images in image queries
+            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(urlData.fileName);
+            if (isImageQuery && isImage) score += 1;
+            
+            return { ...urlData, score };
         });
         
         // Sort by score and get top results
         const sortedUrls = scoredUrls
+            .filter(item => item.score > 0)
             .sort((a, b) => b.score - a.score)
-            .slice(0, isImageQuery ? 3 : 5)  // Show fewer results if specifically asking for images
-            .map(({ url, fileName, score }) => {
+            .slice(0, isImageQuery ? 3 : 5)
+            .map(({ url, fileName }) => {
                 const fileType = fileName.split('.').pop().toLowerCase();
                 const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
-                debugLog(`URL score: ${fileName} = ${score}`);
                 return `${icon} [${decodeURIComponent(fileName)}](${url})`;
             });
             
