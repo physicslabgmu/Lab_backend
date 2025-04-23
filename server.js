@@ -80,9 +80,9 @@ function getRelevantUrls(query) {
             let score = 0;
             
             // Extract filename and remove extension
-            const fileName = url.split('/').pop().split('.')[0];
+            const fileName = decodeURIComponent(url.split('/').pop());
             const fileNameLower = fileName.toLowerCase();
-            const fileType = url.split('.').pop().toLowerCase();
+            const fileType = fileName.split('.').pop().toLowerCase();
             
             // Check if query is asking for images
             const isImageQuery = queryLower.includes('image') || 
@@ -110,22 +110,16 @@ function getRelevantUrls(query) {
                     score += 2;
                 }
                 
-                // Match in full URL
+                // Match in full URL path
                 if (url.toLowerCase().includes(queryWord)) {
                     score += 1;
                 }
             });
-
-            // Ensure image URLs are properly formatted
-            let formattedUrl = url;
-            if (!url.startsWith('http')) {
-                formattedUrl = `https://physicslabgmu.github.io/Lab_db${url.startsWith('/') ? '' : '/'}${url}`;
-            }
             
             return {
-                url: formattedUrl,
+                url,
                 score,
-                fileName,
+                fileName: fileName.split('.')[0].replace(/[-_]/g, ' '),
                 fileType
             };
         });
@@ -137,7 +131,7 @@ function getRelevantUrls(query) {
             .slice(0, 5)
             .map(({ url, fileName, fileType }) => {
                 const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
-                return `${icon} [${decodeURIComponent(fileName)}](${url})`;
+                return `${icon} [${fileName}](${url})`;
             });
             
         debugLog('Found relevant URLs:', sortedUrls);
@@ -146,6 +140,49 @@ function getRelevantUrls(query) {
         console.error('Error in getRelevantUrls:', error);
         return [];
     }
+}
+
+// Function to transform raw links into clickable icons
+function transformLinksToIcons(text) {
+    if (!text) return '';
+
+    // Debug log the input text
+    debugLog('Input text to transform:', text);
+
+    // First, handle markdown-style image links with titles
+    text = text.replace(/🖼️\s*\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (!cleanedUrl) return match;
+        
+        // Debug log each image transformation
+        debugLog('Converting image:', { title, url: cleanedUrl });
+        
+        return `
+            <div class="chat-image-container">
+                <img src="${cleanedUrl}" class="chat-image" alt="${title}" title="${title}" loading="lazy" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.textContent='Image not found';"/>
+                <div class="image-caption">${title}</div>
+            </div>
+        `;
+    });
+
+    // Then handle regular markdown links (non-images)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
+        const cleanedUrl = cleanUrl(url);
+        if (!cleanedUrl) return match;
+
+        const fileType = url.split('.').pop().toLowerCase();
+        const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
+        
+        return `<a href="${cleanedUrl}" target="_blank" rel="noopener noreferrer">${icon} ${title}</a>`;
+    });
+
+    // Add line breaks for better readability
+    text = text.replace(/\n/g, '<br>');
+
+    // Debug log the final output
+    debugLog('Transformed text:', text);
+
+    return text;
 }
 
 // Initialize URL database
@@ -331,61 +368,6 @@ function cleanUrl(url) {
         return '';
     }
     return url.trim();
-}
-
-// Function to transform raw links into clickable icons
-function transformLinksToIcons(text) {
-    if (!text) return '';
-
-    // Debug log the input text
-    debugLog('Input text to transform:', text);
-
-    // First, handle markdown-style image links with titles
-    text = text.replace(/🖼️\s*\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (!cleanedUrl) return match;
-        
-        // Debug log each image transformation
-        debugLog('Converting image:', { title, url: cleanedUrl });
-        
-        return `
-            <div class="chat-image-container">
-                <img src="${cleanedUrl}" class="chat-image" alt="${title}" title="${title}" loading="lazy" onerror="this.onerror=null;this.src='images/fallback.jpg';"/>
-                <div class="image-caption">${title}</div>
-            </div>
-        `;
-    });
-
-    // Then handle regular markdown links (non-images)
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
-        const cleanedUrl = cleanUrl(url);
-        if (!cleanedUrl) return match;
-
-        const fileType = cleanedUrl.split('.').pop().toLowerCase();
-        const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
-        
-        return `<a href="${cleanedUrl}" target="_blank" rel="noopener noreferrer">${icon} ${title}</a>`;
-    });
-
-    // If we still have plain text that looks like an image filename, try to convert it
-    text = text.replace(/\b([\w-]+\.(jpg|jpeg|png|gif))\b/gi, (match) => {
-        const title = match.split('.')[0].replace(/-/g, ' ');
-        const url = `https://physicslabgmu.github.io/Lab_db/images/${match}`;
-        return `
-            <div class="chat-image-container">
-                <img src="${url}" class="chat-image" alt="${title}" title="${title}" loading="lazy" onerror="this.onerror=null;this.src='images/fallback.jpg';"/>
-                <div class="image-caption">${title}</div>
-            </div>
-        `;
-    });
-
-    // Add line breaks for better readability
-    text = text.replace(/\n/g, '<br>');
-
-    // Debug log the final output
-    debugLog('Transformed text:', text);
-
-    return text;
 }
 
 // Add CSS for the link icon
