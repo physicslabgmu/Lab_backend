@@ -41,21 +41,24 @@ function extractKeywords(text) {
 function loadUrlDatabase() {
     try {
         const data = fs.readFileSync('file_urls.txt', 'utf8');
-        urlDatabase = data
+        const urls = data
             .split('\n')
             .map(line => line.trim())
-            .filter(line => line && line.startsWith('http') && !line.includes('logo'))
+            .filter(line => line && !line.includes('logo'))
             .map(url => {
-                const urlParts = url.split('/');
-                const fileName = decodeURIComponent(urlParts[urlParts.length - 1]);
-                const category = urlParts[urlParts.length - 2] || '';
-                const keywords = extractKeywords(fileName + ' ' + category);
-                return { url, fileName, category, keywords };
+                // If URL is relative, make it absolute
+                if (!url.startsWith('http')) {
+                    return `https://physicslabgmu.github.io/Lab_db${url.startsWith('/') ? '' : '/'}${url}`;
+                }
+                return url;
             });
-        debugLog(`Loaded ${urlDatabase.length} URLs`);
-        return urlDatabase;
+        
+        urlDatabase = urls;
+        debugLog(`Loaded ${urls.length} URLs`);
+        return urls;
     } catch (error) {
         console.error('Error loading URL database:', error);
+        urlDatabase = [];
         return [];
     }
 }
@@ -211,15 +214,13 @@ app.post('/api/auth/chat', async (req, res) => {
         // Create context-specific system prompt
         const fullPrompt = `You are a helpful assistant for the GMU Physics Lab.
 When responding about physics topics:
-1. If the user asks about an experiment or equipment, ALWAYS include relevant images in your response
-2. When showing images, describe what each image shows
-3. Always use this markdown format for images: 🖼️ [Image Title](https://link-to-image)
-4. Do NOT use HTML <img> or <a> tags, only markdown links
+1. ONLY use the provided URLs from our local database - do not suggest or use external URLs
+2. If the user asks about an experiment or equipment, include relevant images from the provided URLs
+3. When showing images, describe what each image shows
+4. Always use this markdown format for images: 🖼️ [Image Title](URL)
 5. Include course numbers when relevant (e.g., PHY 161, PHY 260)
 6. Be concise and clear in your explanations
-
-Instead of the links directly being sent to the LLM in prompt, and then asking LLM to return relevant links based on user query, 
-let us maintain vector embeddings in-memory for each link and then do semantic search to retrieve say top 5 links based on user query.
+7. IMPORTANT: Only use URLs that are provided in the "relevant resources" section below
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
@@ -228,14 +229,36 @@ User Query: ${prompt}`;
 
         debugLog('Full prompt:', fullPrompt);
 
-        // Add request to queue
-        requestQueue.push({ prompt: fullPrompt, res });
+        // Configure model
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+
+        const generationConfig = {
+            temperature: 0.7,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048,
+        };
+
+        // Generate chat response
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+            generationConfig,
+        });
+
+        const response = await result.response;
+        const text = response.text();
+
+        // Sanitize before rendering:
+        const cleanResponse = stripHtmlTags(text);
+
+        // Transform links to icons
+        const transformedText = transformLinksToIcons(cleanResponse);
         
-        // Start processing if not already running
-        if (!isProcessing) {
-            processQueue();
-        }
-        
+        res.json({ 
+            message: transformedText,
+            styles: linkIconStyle + pdfIconStyle + imageLinkStyle,
+            success: true 
+        });
     } catch (error) {
         console.error('Server error:', error);
         res.status(500).json({
@@ -259,19 +282,18 @@ async function processQueue() {
     const { prompt, res } = requestQueue.shift();
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const result = await model.generateContent(prompt);
-        
-        if (!result) {
-            throw new Error('No result from Gemini API');
-        }
-        
+        // Generate chat response
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig,
+        });
+
         const response = await result.response;
         const text = response.text();
-        
+
         // Sanitize before rendering:
         const cleanResponse = stripHtmlTags(text);
-        
+
         // Transform links to icons
         const transformedText = transformLinksToIcons(cleanResponse);
         
