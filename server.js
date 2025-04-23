@@ -270,32 +270,39 @@ function cleanUrl(url) {
 
 // Function to transform raw links into clickable icons
 function transformLinksToIcons(text) {
+    if (!text) return '';
+
     // First, handle markdown-style image links with titles
-    text = text.replace(/🖼️ \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
+    text = text.replace(/🖼️\s*\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
         const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<div class="chat-image-container">
-                <img src='${cleanedUrl}' class='chat-image' alt='${title}' title='${title}' />
+        if (!cleanedUrl) return match;
+        
+        return `
+            <div class="chat-image-container">
+                <img src="${cleanedUrl}" class="chat-image" alt="${title}" title="${title}" />
                 <div class="image-caption">${title}</div>
-            </div>`;
-        }
-        return match;
+            </div>
+        `;
     });
 
-    // Then handle any remaining URLs
-    const urlRegex = /(https?:\/\/[^\s)]+)/g;
-    return text.replace(urlRegex, (url) => {
+    // Then handle regular markdown links (non-images)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
         const cleanedUrl = cleanUrl(url);
-        if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
-        } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<div class="chat-image-container">
-                <img src='${cleanedUrl}' class='chat-image' alt='Image' />
-            </div>`;
-        } else {
-            return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
-        }
+        if (!cleanedUrl) return match;
+
+        const fileType = cleanedUrl.split('.').pop().toLowerCase();
+        const icon = fileType === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png', 'gif'].includes(fileType) ? '🖼️' : '•';
+        
+        return `<a href="${cleanedUrl}" target="_blank" rel="noopener noreferrer">${icon} ${title}</a>`;
     });
+
+    // Clean up any remaining HTML tags that might have been in the input
+    text = stripHtmlTags(text);
+
+    // Add line breaks for better readability
+    text = text.replace(/\n/g, '<br>');
+
+    return text;
 }
 
 // Add CSS for the link icon
