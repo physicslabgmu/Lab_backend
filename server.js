@@ -349,7 +349,10 @@ function transformLinksToIcons(text) {
     text = text.replace(/🖼️ \[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, (match, title, url) => {
         const cleanedUrl = cleanUrl(url);
         if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='${title}' title='${title}' /></a>`;
+            return `<div class="chat-image-container">
+                <img src='${cleanedUrl}' class='chat-image' alt='${title}' title='${title}' />
+                <div class="image-caption">${title}</div>
+            </div>`;
         }
         return match;
     });
@@ -361,7 +364,9 @@ function transformLinksToIcons(text) {
         if (cleanedUrl.toLowerCase().endsWith('.pdf')) {
             return `<a href='${cleanedUrl}' target='_blank'><i class='pdf-icon'></i> PDF Document</a>`;
         } else if (cleanedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) {
-            return `<a href='${cleanedUrl}' target='_blank'><img src='${cleanedUrl}' class='image-link' alt='Image' /></a>`;
+            return `<div class="chat-image-container">
+                <img src='${cleanedUrl}' class='chat-image' alt='Image' />
+            </div>`;
         } else {
             return `<a href='${cleanedUrl}' target='_blank'><i class='link-icon'></i> Link</a>`;
         }
@@ -374,10 +379,29 @@ const linkIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z' fill='%23007BFF'/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19V6.413L11.207 14.207L9.793 12.793L17.585 5H13V3H21Z" fill="%23007BFF"/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
+}
+
+.chat-image-container {
+    margin: 10px 0;
+    max-width: 100%;
+    text-align: center;
+}
+
+.chat-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.image-caption {
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #666;
 }
 </style>`;
 
@@ -387,7 +411,7 @@ const pdfIconStyle = `<style>
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z' fill='%23FF0000'/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.364-.235-.606-.704-.606zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.979-.59-1.268-1.255-1.268z" fill="%23FF0000"/></svg>');
     background-repeat: no-repeat;
     background-position: center;
     cursor: pointer;
