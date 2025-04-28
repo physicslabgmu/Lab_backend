@@ -310,32 +310,40 @@ https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy263/spectrumofato
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy263/spectrumofatomichydrogen/rubber%20bands.jpg
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy263/stefan-boltzmanradiationlaw/Stefan-Boltzmann%20radiation%20law.JPG
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy263/waveoptics/wave%20optics.jpg
+
+#PHY 311
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/LabView%20and%20MultiSim/1.jpg
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/LabView%20and%20MultiSim/Phys%20311%20Lab%202%20Multisim%20and%20LabView%20(2)(1).pdf
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/LabView%20and%20MultiSim/Tenna%207720.png
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/LabView%20and%20MultiSim/cables.jpg
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/LabView%20and%20MultiSim/resistors.jpg
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy311/The%20Basics/Lab%201%20Phys%20311.pdf
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/Black_body.pdf
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/IMG-20240311-WA0007.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/banana%20plugs.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/blackbody.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/bulb.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Black%20Body%20Radiation%20and%20Weins%20law/resistors.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Fourier%20Analysis/PHY%20312-%20lab8.pdf
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/LEDs%20VS%20Atomic%20Spectra/LED%20V%20vs%20Atomic%20Spectra.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/PHY312%20Lab%2010.pdf
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%201.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%202.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%203.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%204.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%205.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%206.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%207.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%208.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%20law%201.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Malus's%20Law/malus%20law.jpg
-https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy312/Measurement%20of%20speed%20of%20light%20in%20matter/312%20.pdf
+
+PHY 312
+https://physicslabgmu.github.io/Lab_db/phy312/LEDs%20VS%20Atomic%20Spectra/LED%20V%20vs%20Atomic%20Spectra%20with%20ocean%20optics.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/LEDs%20VS%20Atomic%20Spectra/setup%201.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/LEDs%20VS%20Atomic%20Spectra/setup%202.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Refraction,%20Reflection,%20Total%20Internal%20Reflection/Refraction.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Thin%20Lens%20Configuration/thinlensconfiguration.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Measurement%20of%20speed%20of%20light%20in%20matter/setup1.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Measurement%20of%20speed%20of%20light%20in%20matter/setup2.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Measurement%20of%20speed%20of%20light%20in%20matter/312%20.pdf
+https://physicslabgmu.github.io/Lab_db/phy312/Black%20Body%20Radiation%20and%20Weins%20law/blackbody.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Black%20Body%20Radiation%20and%20Weins%20law/Black_body.pdf
+https://physicslabgmu.github.io/Lab_db/phy312/Fourier%20Analysis/Fourier_setup1.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Fourier%20Analysis/setup2.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Fourier%20Analysis/setup3.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Two_slit/Two_slit.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Two_slit/Lab9-phy312.pdf
+https://physicslabgmu.github.io/Lab_db/phy312/Malus's%20Law/malus%20law.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Malus's%20Law/PHY312%20Lab%2010.pdf
+https://physicslabgmu.github.io/Lab_db/phy312/3D_images_stree_induced_birefringence/3D_birefringence.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/3D_images_stree_induced_birefringence/3D_1.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/3D_images_stree_induced_birefringence/birefringence-phy312.pdf
+https://physicslabgmu.github.io/Lab_db/phy312/Rotation%20by%20optically%20active%20materials/Rotation.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Rotation%20by%20optically%20active%20materials/Equipment_1.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Rotation%20by%20optically%20active%20materials/Equipment_2.jpg
+https://physicslabgmu.github.io/Lab_db/phy312/Rotation%20by%20optically%20active%20materials/phy312-lab12.pdf
 
 ### PHY 103
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy103/Archimedes%20Principle%202016.pdf
@@ -886,4 +894,6 @@ https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy246/rcdecay/red%2
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy246/rcdecay/stopwatch%20sprt.%20ln.png
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy246/standingwaves/Phys246%20Standing%20Waves%20June%202018(1)(1).pdf
 https://raw.githubusercontent.com/physicslabgmu/Lab_db/main/phy246/standingwaves/Standing%20Waves.JPG
+
+
 
