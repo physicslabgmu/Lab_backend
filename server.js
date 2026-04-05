@@ -6,6 +6,7 @@ const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth-route');
+const uploadRoutes = require('./routes/routes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -191,7 +192,7 @@ debugLog('Loaded URL database');
 
 // Configure CORS
 app.use(cors({
-    origin: ['https://physicslabgmu.github.io', 'http://localhost:3000', 'http://localhost:5500'],
+    origin: ['https://physicslabgmu.github.io', 'http://localhost:3000', 'http://localhost:5500', 'http://localhost:8080'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -202,7 +203,8 @@ app.options('*', (req, res) => {
     const origin = req.headers.origin;
     if (origin === 'https://physicslabgmu.github.io' || 
         origin === 'http://localhost:3000' || 
-        origin === 'http://localhost:5500') {
+        origin === 'http://localhost:5500' ||
+        origin === 'http://localhost:8080') {
         res.header('Access-Control-Allow-Origin', origin);
         res.header('Access-Control-Allow-Credentials', 'true');
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -225,6 +227,9 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Use authentication routes
 app.use('/api/auth', authRoutes);
+
+// Admin upload routes (R2): GET /api/admin/ping, POST /api/upload
+app.use('/api', uploadRoutes);
 
 // Utility: Strip HTML tags from LLM output
 function stripHtmlTags(text) {
@@ -261,7 +266,8 @@ When responding about physics topics:
 4. Include course numbers when relevant (e.g., PHY 161, PHY 260)
 5. Be concise and clear in your explanations
 6. IMPORTANT: Only use URLs that are provided in the "relevant resources" section below
-7. Do not create or suggest URLs - only use the exact URLs provided below
+7. Do not create or suggest URLs - only use the exact URLs provided below.
+8. If the user asks about all the images in a single subject, list them all.
 
 Here are some relevant resources for this query:
 ${relevantUrls.join('\n')}
