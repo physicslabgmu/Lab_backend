@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { randomUUID, createHash } = require('crypto');
 const path = require('path');
-const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const adminBasicAuth = require('../middleware/adminBasicAuth');
 const { getR2Client, getBucket, getPublicBaseUrl } = require('../lib/r2Client');
 
@@ -13,6 +13,17 @@ const upload = multer({
 });
 
 const MAX_FILES_PER_REQUEST = 20;
+const ALLOWED_COURSES = [
+    'phy103',
+    'phy104',
+    'phy161',
+    'phy244',
+    'phy246',
+    'phy261',
+    'phy263',
+    'phy311',
+    'phy312',
+];
 
 function isPdfFile(f) {
     const name = (f.originalname || '').toLowerCase();
@@ -22,6 +33,27 @@ function isPdfFile(f) {
 function activityKeyFrom(course, activityName) {
     const n = (activityName || '').trim();
     return createHash('sha256').update(`${course}\0${n}`).digest('hex').slice(0, 32);
+}
+
+function isAllowedCourse(course) {
+    return ALLOWED_COURSES.indexOf(course) >= 0;
+}
+
+function isValidUploadKey(key) {
+    return /^uploads\/[A-Za-z0-9._-]+$/.test(key);
+}
+
+function getAdminUserFromAuth(req) {
+    const auth = req.headers && req.headers.authorization;
+    if (!auth || auth.indexOf('Basic ') !== 0) return '';
+    try {
+        const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
+        const sep = decoded.indexOf(':');
+        if (sep <= 0) return '';
+        return decoded.slice(0, sep);
+    } catch (_) {
+        return '';
+    }
 }
 
 const SLOTS_KEY = 'config/asset-slots.json';
@@ -241,6 +273,112 @@ router.get('/public/asset-slots', async (_req, res, next) => {
         const slots = await readSlotsJson();
         res.set('Cache-Control', 'public, max-age=60');
         res.json(slots);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/admin/delete-attachment', adminBasicAuth, async (req, res, next) => {
+    try {
+        const course = ((req.body && req.body.course) || '').trim().toLowerCase();
+        const key = ((req.body && req.body.key) || '').trim();
+        const listName = ((req.body && req.body.list) || '').trim().toLowerCase();
+
+        if (!isAllowedCourse(course)) {
+            return res.status(400).json({ error: 'Invalid course' });
+        }
+        if (!isValidUploadKey(key)) {
+            return res.status(400).json({ error: 'Invalid key format' });
+        }
+        if (listName !== 'files' && listName !== 'manuals') {
+            return res.status(400).json({ error: 'Invalid list. Use files or manuals.' });
+        }
+
+        const slots = await readSlotsJson();
+        const arrayKey = `${course}:new_rows`;
+        const rows = slots[arrayKey];
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return res.status(404).json({ error: 'Attachment not in manifest' });
+        }
+
+        let rowIndex = -1;
+        let itemIndex = -1;
+        let legacyTopLevel = false;
+        for (let i = 0; i < rows.length; i++) {
+            const entry = rows[i];
+            const arr = Array.isArray(entry[listName]) ? entry[listName] : [];
+            const idx = arr.findIndex((item) => item && item.key === key);
+            if (idx >= 0) {
+                rowIndex = i;
+                itemIndex = idx;
+                break;
+            }
+            if (listName === 'files' && entry && entry.key === key) {
+                rowIndex = i;
+                legacyTopLevel = true;
+                break;
+            }
+        }
+
+        if (rowIndex < 0) {
+            return res.status(404).json({ error: 'Attachment not in manifest' });
+        }
+
+        try {
+            await getR2Client().send(
+                new DeleteObjectCommand({
+                    Bucket: getBucket(),
+                    Key: key,
+                })
+            );
+        } catch (err) {
+            if (!(err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404)) {
+                return res.status(502).json({
+                    error: 'Failed to delete file from storage',
+                    details: err.message,
+                });
+            }
+        }
+
+        const entry = rows[rowIndex];
+        if (legacyTopLevel) {
+            delete entry.url;
+            delete entry.key;
+            delete entry.fileName;
+            delete entry.alt;
+        } else {
+            if (!Array.isArray(entry[listName])) entry[listName] = [];
+            if (itemIndex >= 0) entry[listName].splice(itemIndex, 1);
+        }
+
+        const filesLeft = Array.isArray(entry.files) ? entry.files.length : 0;
+        const manualsLeft = Array.isArray(entry.manuals) ? entry.manuals.length : 0;
+        const hasLegacyFile = !!entry.url;
+        let rowRemoved = false;
+        if (filesLeft === 0 && manualsLeft === 0 && !hasLegacyFile) {
+            rows.splice(rowIndex, 1);
+            rowRemoved = true;
+        }
+
+        await writeSlotsJson(slots);
+
+        console.log(
+            '[admin-delete]',
+            JSON.stringify({
+                course,
+                activityKey: entry.activityKey || null,
+                list: listName,
+                key,
+                adminUser: getAdminUserFromAuth(req) || null,
+                rowRemoved,
+            })
+        );
+
+        res.json({
+            ok: true,
+            removedKey: key,
+            rowRemoved,
+        });
     } catch (err) {
         next(err);
     }
