@@ -3,8 +3,10 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const crypto = require('crypto');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -60,24 +62,16 @@ const otpSchema = new mongoose.Schema({
 
 const OTP = mongoose.model('OTP', otpSchema);
 
-// Nodemailer setup
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
 // Generate OTP
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send OTP via email
+// Send OTP via email (Resend HTTPS API — works on Render)
 async function sendOTPEmail(email, otp) {
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
+    const from = process.env.EMAIL_FROM || 'GMU Physics Lab <onboarding@resend.com>';
+    const { error } = await resend.emails.send({
+        from,
         to: email,
         subject: 'Email Verification Code - GMU Physics Lab',
         html: `
@@ -94,9 +88,11 @@ async function sendOTPEmail(email, otp) {
                 <p style="color: #555; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
             </div>
         `
-    };
+    });
 
-    return transporter.sendMail(mailOptions);
+    if (error) {
+        throw new Error(error.message);
+    }
 }
 
 // Middleware to verify JWT token
