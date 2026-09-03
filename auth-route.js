@@ -3,10 +3,22 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
-const { Resend } = require('resend');
+const { google } = require('googleapis');
 const crypto = require('crypto');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getGmailClient() {
+    const clientId = process.env.GMAIL_CLIENT_ID;
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+    const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+
+    if (!clientId || !clientSecret || !refreshToken) {
+        throw new Error('Missing Gmail OAuth env vars (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    return google.gmail({ version: 'v1', auth: oauth2Client });
+}
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -67,14 +79,15 @@ function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send OTP via email (Resend HTTPS API — works on Render)
+// Send OTP via email (Gmail API over HTTPS — works on Render)
 async function sendOTPEmail(email, otp) {
-    const from = process.env.EMAIL_FROM || 'GMU Physics Lab <onboarding@resend.com>';
-    const { error } = await resend.emails.send({
-        from,
-        to: email,
-        subject: 'Email Verification Code - GMU Physics Lab',
-        html: `
+    const from = process.env.GMAIL_USER;
+    if (!from) {
+        throw new Error('Missing GMAIL_USER env var');
+    }
+
+    const subject = 'Email Verification Code - GMU Physics Lab';
+    const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
                 <div style="text-align: center; margin-bottom: 20px;">
                     <img src="https://lab-backend-nwko.onrender.com/logo.png" alt="GMU Physics Lab" style="max-width: 200px;">
@@ -87,12 +100,29 @@ async function sendOTPEmail(email, otp) {
                 <p style="color: #555; font-size: 14px;">This code will expire in 1 minute.</p>
                 <p style="color: #555; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
             </div>
-        `
-    });
+        `;
 
-    if (error) {
-        throw new Error(error.message);
-    }
+    const messageParts = [
+        `From: GMU Physics Lab <${from}>`,
+        `To: ${email}`,
+        `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        html
+    ];
+
+    const encodedMessage = Buffer.from(messageParts.join('\r\n'))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+    const gmail = getGmailClient();
+    await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw: encodedMessage }
+    });
 }
 
 // Middleware to verify JWT token
